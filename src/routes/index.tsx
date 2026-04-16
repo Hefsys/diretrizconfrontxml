@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useCallback, useEffect, lazy, Suspense, type ComponentType } from 'react';
+import { useState, useCallback, useEffect, type ComponentType } from 'react';
 import type { WorkBook } from 'xlsx';
 import type { ConfrontoResult, ConfrontoSummary } from '@/lib/types';
 
@@ -13,26 +13,25 @@ export const Route = createFileRoute('/')({
   component: Index,
 });
 
-const LazyUploadSection = lazy(() =>
-  import('@/components/UploadSection').then((m) => ({ default: m.UploadSection }))
-);
-const LazyResultsSection = lazy(() =>
-  import('@/components/ResultsSection').then((m) => ({ default: m.ResultsSection }))
-);
-
-function LoadingSpinner() {
-  return (
-    <div className="flex min-h-[50vh] items-center justify-center">
-      <span className="h-8 w-8 animate-spin rounded-full border-4 border-diretriz-red border-t-transparent" />
-    </div>
-  );
-}
-
 function Index() {
+  const [mounted, setMounted] = useState(false);
   const [view, setView] = useState<'upload' | 'results'>('upload');
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<ConfrontoResult[]>([]);
   const [summary, setSummary] = useState<ConfrontoSummary | null>(null);
+  const [UploadComp, setUploadComp] = useState<ComponentType<any> | null>(null);
+  const [ResultsComp, setResultsComp] = useState<ComponentType<any> | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    Promise.all([
+      import('@/components/UploadSection'),
+      import('@/components/ResultsSection'),
+    ]).then(([u, r]) => {
+      setUploadComp(() => u.UploadSection);
+      setResultsComp(() => r.ResultsSection);
+    });
+  }, []);
 
   const handleProcess = useCallback(async (xmlFiles: File[], workbook: WorkBook, selectedSheets: string[]) => {
     setIsProcessing(true);
@@ -60,26 +59,38 @@ function Index() {
     setSummary(null);
   }, []);
 
+  const header = (
+    <header className="border-b bg-diretriz-dark">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+        <div className="flex items-center gap-3">
+          <span className="text-lg font-bold text-white">Diretriz</span>
+          <span className="text-sm text-white/60">Contabilidade</span>
+        </div>
+        <span className="text-xs text-white/40">Confronto NF-e</span>
+      </div>
+    </header>
+  );
+
+  if (!mounted || !UploadComp || !ResultsComp) {
+    return (
+      <div className="min-h-screen bg-background">
+        {header}
+        <main className="flex min-h-[50vh] items-center justify-center p-6">
+          <span className="h-8 w-8 animate-spin rounded-full border-4 border-diretriz-red border-t-transparent" />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-diretriz-dark">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-3">
-            <span className="text-lg font-bold text-white">Diretriz</span>
-            <span className="text-sm text-white/60">Contabilidade</span>
-          </div>
-          <span className="text-xs text-white/40">Confronto NF-e</span>
-        </div>
-      </header>
-
+      {header}
       <main className="p-6">
-        <Suspense fallback={<LoadingSpinner />}>
-          {view === 'upload' ? (
-            <LazyUploadSection onProcess={handleProcess} isProcessing={isProcessing} />
-          ) : summary ? (
-            <LazyResultsSection results={results} summary={summary} onReset={handleReset} />
-          ) : null}
-        </Suspense>
+        {view === 'upload' ? (
+          <UploadComp onProcess={handleProcess} isProcessing={isProcessing} />
+        ) : summary ? (
+          <ResultsComp results={results} summary={summary} onReset={handleReset} />
+        ) : null}
       </main>
     </div>
   );
