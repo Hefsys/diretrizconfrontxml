@@ -27,8 +27,8 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
   }, []);
 
   const handleXmlSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    setXmlFiles((prev) => [...prev, ...files]);
+    const files = Array.from(e.target.files ?? []).filter((f) => f.name.toLowerCase().endsWith('.xml'));
+    if (files.length > 0) setXmlFiles((prev) => [...prev, ...files]);
   }, []);
 
   const handleExcelSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
