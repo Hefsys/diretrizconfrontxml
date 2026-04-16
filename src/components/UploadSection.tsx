@@ -17,6 +17,7 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
   const xmlInputRef = useRef<HTMLInputElement>(null);
+  const xmlFolderInputRef = useRef<HTMLInputElement>(null);
   const excelInputRef = useRef<HTMLInputElement>(null);
 
   const handleXmlDrop = useCallback((e: React.DragEvent) => {
