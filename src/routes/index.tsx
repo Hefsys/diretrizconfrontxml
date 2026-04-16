@@ -1,11 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense, type ComponentType } from 'react';
 import type { WorkBook } from 'xlsx';
-import { UploadSection } from '@/components/UploadSection';
-import { ResultsSection } from '@/components/ResultsSection';
-import { parseXmlFiles } from '@/lib/xml-parser';
-import { parseSheet } from '@/lib/excel-parser';
-import { runConfronto } from '@/lib/confronto-engine';
 import type { ConfrontoResult, ConfrontoSummary } from '@/lib/types';
 
 export const Route = createFileRoute('/')({
@@ -18,6 +13,21 @@ export const Route = createFileRoute('/')({
   component: Index,
 });
 
+const LazyUploadSection = lazy(() =>
+  import('@/components/UploadSection').then((m) => ({ default: m.UploadSection }))
+);
+const LazyResultsSection = lazy(() =>
+  import('@/components/ResultsSection').then((m) => ({ default: m.ResultsSection }))
+);
+
+function LoadingSpinner() {
+  return (
+    <div className="flex min-h-[50vh] items-center justify-center">
+      <span className="h-8 w-8 animate-spin rounded-full border-4 border-diretriz-red border-t-transparent" />
+    </div>
+  );
+}
+
 function Index() {
   const [view, setView] = useState<'upload' | 'results'>('upload');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -27,13 +37,12 @@ function Index() {
   const handleProcess = useCallback(async (xmlFiles: File[], workbook: WorkBook, selectedSheets: string[]) => {
     setIsProcessing(true);
     try {
-      // Parse XMLs
+      const { parseXmlFiles } = await import('@/lib/xml-parser');
+      const { parseSheet } = await import('@/lib/excel-parser');
+      const { runConfronto } = await import('@/lib/confronto-engine');
+
       const xmlData = await parseXmlFiles(xmlFiles);
-
-      // Parse selected sheets
       const allExcelData = selectedSheets.flatMap((sheet) => parseSheet(workbook, sheet));
-
-      // Run confronto
       const { results: r, summary: s } = runConfronto(allExcelData, xmlData);
       setResults(r);
       setSummary(s);
@@ -53,7 +62,6 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Top Bar */}
       <header className="border-b bg-diretriz-dark">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-3">
@@ -65,11 +73,13 @@ function Index() {
       </header>
 
       <main className="p-6">
-        {view === 'upload' ? (
-          <UploadSection onProcess={handleProcess} isProcessing={isProcessing} />
-        ) : summary ? (
-          <ResultsSection results={results} summary={summary} onReset={handleReset} />
-        ) : null}
+        <Suspense fallback={<LoadingSpinner />}>
+          {view === 'upload' ? (
+            <LazyUploadSection onProcess={handleProcess} isProcessing={isProcessing} />
+          ) : summary ? (
+            <LazyResultsSection results={results} summary={summary} onReset={handleReset} />
+          ) : null}
+        </Suspense>
       </main>
     </div>
   );
