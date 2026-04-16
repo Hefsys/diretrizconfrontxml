@@ -1,11 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import type { WorkBook } from 'xlsx';
-import { UploadSection } from '@/components/UploadSection';
-import { ResultsSection } from '@/components/ResultsSection';
-import { parseXmlFiles } from '@/lib/xml-parser';
-import { parseSheet } from '@/lib/excel-parser';
-import { runConfronto } from '@/lib/confronto-engine';
 import type { ConfrontoResult, ConfrontoSummary } from '@/lib/types';
 
 export const Route = createFileRoute('/')({
