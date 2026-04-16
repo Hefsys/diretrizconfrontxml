@@ -1,0 +1,206 @@
+import { useState, useCallback, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { WorkBook } from 'xlsx';
+import { readWorkbook, getSheetNames, autoDetectSheet } from '@/lib/excel-parser';
+
+interface UploadSectionProps {
+  onProcess: (xmlFiles: File[], workbook: WorkBook, selectedSheets: string[]) => void;
+  isProcessing: boolean;
+}
+
+export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
+  const [xmlFiles, setXmlFiles] = useState<File[]>([]);
+  const [workbook, setWorkbook] = useState<WorkBook | null>(null);
+  const [excelFileName, setExcelFileName] = useState('');
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
+  const xmlInputRef = useRef<HTMLInputElement>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
+
+  const handleXmlDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files).filter((f) => f.name.endsWith('.xml'));
+    setXmlFiles((prev) => [...prev, ...files]);
+  }, []);
+
+  const handleXmlSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    setXmlFiles((prev) => [...prev, ...files]);
+  }, []);
+
+  const handleExcelSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExcelFileName(file.name);
+    const buffer = await file.arrayBuffer();
+    const wb = readWorkbook(buffer);
+    setWorkbook(wb);
+    const names = getSheetNames(wb);
+    setSheetNames(names);
+    const auto = autoDetectSheet(wb);
+    setSelectedSheets(auto ? [auto] : names.length > 0 ? [names[0]] : []);
+  }, []);
+
+  const toggleSheet = (name: string) => {
+    setSelectedSheets((prev) =>
+      prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name]
+    );
+  };
+
+  const canProcess = xmlFiles.length > 0 && workbook && selectedSheets.length > 0;
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-8">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-diretriz-dark">Confronto NF-e</h1>
+        <p className="mt-2 text-muted-foreground">
+          Confronte XMLs de NF-e com o Registro de Entrada ICMS
+        </p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* XML Upload Card */}
+        <Card
+          className="border-2 border-dashed transition-colors hover:border-diretriz-red/40"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleXmlDrop}
+        >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-diretriz-red/10 text-sm font-bold text-diretriz-red">
+                XML
+              </span>
+              XMLs das NF-e
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center gap-4 py-6">
+              <div className="text-center text-sm text-muted-foreground">
+                Arraste arquivos .xml aqui ou
+              </div>
+              <input
+                ref={xmlInputRef}
+                type="file"
+                accept=".xml"
+                multiple
+                className="hidden"
+                onChange={handleXmlSelect}
+              />
+              <Button
+                variant="outline"
+                onClick={() => xmlInputRef.current?.click()}
+                className="border-diretriz-red/30 text-diretriz-red hover:bg-diretriz-red/5"
+              >
+                Selecionar XMLs
+              </Button>
+              {xmlFiles.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-diretriz-red text-xs font-bold text-white">
+                    {xmlFiles.length}
+                  </span>
+                  <span className="text-sm font-medium">
+                    {xmlFiles.length === 1 ? 'arquivo carregado' : 'arquivos carregados'}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setXmlFiles([])}
+                    className="h-6 px-2 text-xs text-muted-foreground"
+                  >
+                    Limpar
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Excel Upload Card */}
+        <Card className="border-2 border-dashed transition-colors hover:border-diretriz-dark/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-diretriz-dark/10 text-sm font-bold text-diretriz-dark">
+                XLS
+              </span>
+              Planilha de Registro de Entrada
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col items-center gap-4 py-6">
+              <div className="text-center text-sm text-muted-foreground">
+                Arquivo .xlsx ou .xlsb
+              </div>
+              <input
+                ref={excelInputRef}
+                type="file"
+                accept=".xlsx,.xlsb,.xls"
+                className="hidden"
+                onChange={handleExcelSelect}
+              />
+              <Button
+                variant="outline"
+                onClick={() => excelInputRef.current?.click()}
+                className="border-diretriz-dark/30 text-diretriz-dark hover:bg-diretriz-dark/5"
+              >
+                Selecionar Planilha
+              </Button>
+              {excelFileName && (
+                <div className="text-center">
+                  <p className="text-sm font-medium">{excelFileName}</p>
+                  <p className="text-xs text-muted-foreground">{sheetNames.length} aba(s) encontrada(s)</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Sheet Selector */}
+      {sheetNames.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Selecione as abas para processar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {sheetNames.map((name) => (
+                <button
+                  key={name}
+                  onClick={() => toggleSheet(name)}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    selectedSheets.includes(name)
+                      ? 'border-diretriz-red bg-diretriz-red text-white'
+                      : 'border-border bg-background text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Process Button */}
+      <div className="flex justify-center">
+        <Button
+          size="lg"
+          disabled={!canProcess || isProcessing}
+          onClick={() => workbook && onProcess(xmlFiles, workbook, selectedSheets)}
+          className="bg-diretriz-red px-8 text-white hover:bg-diretriz-red/90 disabled:opacity-50"
+        >
+          {isProcessing ? (
+            <span className="flex items-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Processando...
+            </span>
+          ) : (
+            'Processar Confronto'
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
