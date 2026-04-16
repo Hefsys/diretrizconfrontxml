@@ -17,6 +17,7 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
   const xmlInputRef = useRef<HTMLInputElement>(null);
+  const xmlFolderInputRef = useRef<HTMLInputElement>(null);
   const excelInputRef = useRef<HTMLInputElement>(null);
 
   const handleXmlDrop = useCallback((e: React.DragEvent) => {
@@ -26,8 +27,8 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
   }, []);
 
   const handleXmlSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    setXmlFiles((prev) => [...prev, ...files]);
+    const files = Array.from(e.target.files ?? []).filter((f) => f.name.toLowerCase().endsWith('.xml'));
+    if (files.length > 0) setXmlFiles((prev) => [...prev, ...files]);
   }, []);
 
   const handleExcelSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,13 +89,29 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
                 className="hidden"
                 onChange={handleXmlSelect}
               />
-              <Button
-                variant="outline"
-                onClick={() => xmlInputRef.current?.click()}
-                className="border-diretriz-red/30 text-diretriz-red hover:bg-diretriz-red/5"
-              >
-                Selecionar XMLs
-              </Button>
+              <input
+                ref={xmlFolderInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleXmlSelect}
+                {...({ webkitdirectory: '', directory: '' } as React.InputHTMLAttributes<HTMLInputElement>)}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => xmlFolderInputRef.current?.click()}
+                  className="border-diretriz-red/30 text-diretriz-red hover:bg-diretriz-red/5"
+                >
+                  Selecionar Pasta
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => xmlInputRef.current?.click()}
+                  className="border-diretriz-red/30 text-diretriz-red hover:bg-diretriz-red/5"
+                >
+                  Selecionar Arquivos
+                </Button>
+              </div>
               {xmlFiles.length > 0 && (
                 <div className="flex items-center gap-2">
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-diretriz-red text-xs font-bold text-white">
