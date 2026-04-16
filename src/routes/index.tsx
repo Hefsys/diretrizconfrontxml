@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState, useCallback, useEffect, type ComponentType } from 'react';
 import type { WorkBook } from 'xlsx';
 import type { ConfrontoResult, ConfrontoSummary } from '@/lib/types';
+import logoDiretriz from '@/assets/logo-diretriz.png';
 
 export const Route = createFileRoute('/')({
   head: () => ({
@@ -60,13 +61,12 @@ function Index() {
   }, []);
 
   const header = (
-    <header className="border-b bg-diretriz-dark">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+    <header className="border-b border-border bg-sidebar">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3">
-          <span className="text-lg font-bold text-white">Diretriz</span>
-          <span className="text-sm text-white/60">Contabilidade</span>
+          <img src={logoDiretriz} alt="Diretriz Contabilidade" className="h-9 w-auto" />
         </div>
-        <span className="text-xs text-white/40">Confronto NF-e</span>
+        <span className="text-xs uppercase tracking-widest text-muted-foreground">Confronto NF-e</span>
       </div>
     </header>
   );
