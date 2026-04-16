@@ -88,13 +88,29 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
                 className="hidden"
                 onChange={handleXmlSelect}
               />
-              <Button
-                variant="outline"
-                onClick={() => xmlInputRef.current?.click()}
-                className="border-diretriz-red/30 text-diretriz-red hover:bg-diretriz-red/5"
-              >
-                Selecionar XMLs
-              </Button>
+              <input
+                ref={xmlFolderInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleXmlSelect}
+                {...({ webkitdirectory: '', directory: '' } as React.InputHTMLAttributes<HTMLInputElement>)}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => xmlFolderInputRef.current?.click()}
+                  className="border-diretriz-red/30 text-diretriz-red hover:bg-diretriz-red/5"
+                >
+                  Selecionar Pasta
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => xmlInputRef.current?.click()}
+                  className="border-diretriz-red/30 text-diretriz-red hover:bg-diretriz-red/5"
+                >
+                  Selecionar Arquivos
+                </Button>
+              </div>
               {xmlFiles.length > 0 && (
                 <div className="flex items-center gap-2">
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-diretriz-red text-xs font-bold text-white">
