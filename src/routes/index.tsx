@@ -71,7 +71,7 @@ function Index() {
     setSummary(null);
   }, []);
 
-  const header = (
+  const headerEl = (
     <header className="border-b border-border bg-sidebar">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <div className="flex items-center gap-6">
@@ -95,7 +95,7 @@ function Index() {
   if (authLoading || !user || !mounted || !UploadComp || !ResultsComp) {
     return (
       <div className="min-h-screen bg-background">
-        {header}
+        {headerEl}
         <main className="flex min-h-[50vh] items-center justify-center p-6">
           <span className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </main>
@@ -105,7 +105,7 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      {header}
+      {headerEl}
       <main className="p-6">
         {view === 'upload' ? (
           <UploadComp onProcess={handleProcess} isProcessing={isProcessing} />
