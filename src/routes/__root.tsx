@@ -30,14 +30,18 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Diretriz Confrontramento Relatório-XML" },
+      { name: "description", content: "Plataforma de confrontamento da Diretriz Contabilidade dos relatórios em Excel com o XML" },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Diretriz Confrontramento Relatório-XML" },
+      { property: "og:description", content: "Plataforma de confrontamento da Diretriz Contabilidade dos relatórios em Excel com o XML" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Diretriz Confrontramento Relatório-XML" },
+      { name: "twitter:description", content: "Plataforma de confrontamento da Diretriz Contabilidade dos relatórios em Excel com o XML" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4aa259d8-fcf3-4eaa-8130-0cb6759d95ed/id-preview-a5b1f976--0d785596-a698-4937-8696-9fa97b33b55c.lovable.app-1776455563312.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4aa259d8-fcf3-4eaa-8130-0cb6759d95ed/id-preview-a5b1f976--0d785596-a698-4937-8696-9fa97b33b55c.lovable.app-1776455563312.png" },
     ],
     links: [
       {
