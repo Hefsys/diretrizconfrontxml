@@ -1,7 +1,10 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useState, useCallback, useEffect, type ComponentType } from 'react';
 import type { WorkBook } from 'xlsx';
 import type { ConfrontoResult, ConfrontoSummary } from '@/lib/types';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { LogOut } from 'lucide-react';
 import logoDiretriz from '@/assets/logo-diretriz.png';
 
 export const Route = createFileRoute('/')({
@@ -71,12 +74,34 @@ function Index() {
     </header>
   );
 
-  if (!mounted || !UploadComp || !ResultsComp) {
+  const header = (
+    <header className="border-b border-border bg-sidebar">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="flex items-center gap-6">
+          <img src={logoDiretriz} alt="Diretriz Contabilidade" className="h-9 w-auto" />
+          <nav className="flex items-center gap-4 text-sm">
+            <Link to="/" className="text-foreground font-medium">Confronto</Link>
+            <Link to="/empresas" className="text-muted-foreground hover:text-foreground transition-colors">Empresas</Link>
+          </nav>
+        </div>
+        <div className="flex items-center gap-3">
+          {user && <span className="text-xs text-muted-foreground hidden sm:inline">{user.email}</span>}
+          {user && (
+            <Button variant="ghost" size="sm" onClick={() => signOut()}>
+              <LogOut className="h-4 w-4" /> Sair
+            </Button>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+
+  if (authLoading || !user || !mounted || !UploadComp || !ResultsComp) {
     return (
       <div className="min-h-screen bg-background">
         {header}
         <main className="flex min-h-[50vh] items-center justify-center p-6">
-          <span className="h-8 w-8 animate-spin rounded-full border-4 border-diretriz-red border-t-transparent" />
+          <span className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </main>
       </div>
     );
