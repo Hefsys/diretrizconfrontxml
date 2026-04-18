@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import logoDiretriz from '@/assets/logo-diretriz.png';
+import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
 
 export const Route = createFileRoute('/auth')({
   head: () => ({
@@ -107,10 +107,10 @@ function AuthPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <header className="border-b border-border bg-sidebar">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <img src={logoDiretriz} alt="Diretriz Contabilidade" className="h-9 w-auto" />
-          <span className="text-xs uppercase tracking-widest text-muted-foreground">Confronto NF-e</span>
+      <header className="border-b border-border bg-sidebar backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto flex items-center justify-between h-20 px-4">
+          <img src={logoDiretriz} alt="Diretriz Contabilidade" className="h-16" />
+          <span className="text-xs uppercase tracking-widest text-white/70">Confronto NF-e</span>
         </div>
       </header>
       <main className="flex-1 flex items-center justify-center p-6">

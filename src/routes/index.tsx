@@ -5,7 +5,7 @@ import type { ConfrontoResult, ConfrontoSummary } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
-import logoDiretriz from '@/assets/logo-diretriz.png';
+import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
 
 export const Route = createFileRoute('/')({
   head: () => ({
@@ -72,20 +72,20 @@ function Index() {
   }, []);
 
   const headerEl = (
-    <header className="border-b border-border bg-sidebar">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+    <header className="border-b border-border bg-sidebar backdrop-blur-sm sticky top-0 z-50">
+      <div className="container mx-auto flex items-center justify-between h-20 px-4">
         <div className="flex items-center gap-6">
-          <img src={logoDiretriz} alt="Diretriz Contabilidade" className="h-9 w-auto" />
+          <img src={logoDiretriz} alt="Diretriz Contabilidade" className="h-16" />
           <nav className="flex items-center gap-4 text-sm">
-            <Link to="/" className="text-foreground font-medium">Confronto</Link>
-            <Link to="/empresas" className="text-muted-foreground hover:text-foreground transition-colors">Empresas</Link>
+            <Link to="/" className="text-white font-medium">Confronto</Link>
+            <Link to="/empresas" className="text-white/70 hover:text-white transition-colors">Empresas</Link>
           </nav>
         </div>
         <div className="flex items-center gap-3">
-          {user && <span className="text-xs text-muted-foreground hidden sm:inline">{user.email}</span>}
+          {user && <span className="text-xs text-white/70 hidden sm:inline">{user.email}</span>}
           {user && (
-            <Button variant="ghost" size="sm" onClick={() => signOut()}>
-              <LogOut className="h-4 w-4" /> Sair
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10" onClick={() => signOut()} title="Sair">
+              <LogOut className="h-4 w-4" />
             </Button>
           )}
         </div>
