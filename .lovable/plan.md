@@ -1,51 +1,60 @@
 
 
-## Melhorias na tela de Resultados
+## Visão mês a mês + Drag-and-drop por mês
 
-Duas melhorias na seção de resultados do confronto:
+Duas melhorias na tela de Resultados:
 
-### 1. Botão "Adicionar XMLs Avulsos" (resolve "Ausentes no XML")
+### 1. Agrupamento mensal (visão mês a mês)
 
-Quando existirem registros com status **"Ausente no XML"** (NF lançada na planilha mas o XML não estava no lote inicial — geralmente porque foi emitida fora do prazo), aparecerá um botão para enviar XMLs avulsos sem precisar refazer toda a análise.
-
-**Comportamento:**
-- Botão **"Adicionar XMLs"** no topo da seção de resultados (ao lado de "Exportar Excel" / "Nova Análise"), visível quando houver pelo menos 1 ausente.
-- Abre seletor de arquivos `.xml` (múltiplos).
-- Os XMLs novos são parseados e re-confrontados **apenas contra os registros atualmente "ausente_xml"**, mantendo todos os demais resultados intactos.
-- Cada match transforma o registro de `ausente_xml` em `ok` (ou `divergente` se houver diferença de valor) e os contadores do resumo são recalculados.
-- XMLs novos que não baterem com nenhum ausente entram como `nao_escriturado`.
-- Toast informando: "X notas reconciliadas, Y XMLs sem correspondência".
-
-### 2. Botão de excluir linha (resolve divergências por nota cancelada)
-
-Cada linha da tabela ganha um pequeno botão **lixeira** (ícone) na última coluna, para o usuário descartar manualmente registros que sabe serem inválidos (nota cancelada, lançamento duplicado, etc.).
+Os resultados ganham um **seletor de mês** para filtrar/visualizar o confronto separadamente por competência.
 
 **Comportamento:**
-- Ícone discreto (Trash2 do lucide-react), aparece em todas as linhas.
-- Ao clicar abre um `AlertDialog` de confirmação ("Excluir este registro do confronto?") para evitar exclusão acidental.
-- Confirmado: remove o registro do array `results` e recalcula `summary` (totais + contadores por status).
-- A exclusão é apenas **na sessão atual** (não persiste no banco). A exportação para Excel reflete o estado já filtrado.
+- O mês de cada registro é derivado do campo `data` (DD/MM/AAAA) — para XMLs vem de `dhEmi`, para planilha vem de `dataDocumento`/`dataEntrada`.
+- Acima dos cards de resumo aparece uma **linha de abas/chips de mês**: `Todos | Jan/2025 | Fev/2025 | Mar/2025...` (apenas meses presentes nos dados, ordenados cronologicamente).
+- Cada chip mostra a contagem de registros daquele mês: `Jan/2025 (42)`.
+- Ao selecionar um mês, **tudo é filtrado por aquela competência**: cards de resumo recalculam (OK, divergentes, ausentes etc. **só daquele mês**), filtros de status, tabela e exportação Excel.
+- "Todos" mantém o comportamento atual (visão consolidada).
+
+### 2. Drag-and-drop de XMLs por mês
+
+O botão "Adicionar XMLs" evolui para uma **zona de arrastar-e-soltar contextual ao mês selecionado**.
+
+**Comportamento:**
+- Quando um mês específico estiver selecionado e houver pelo menos 1 ausente nesse mês, aparece uma **dropzone tracejada** logo abaixo do header: *"Arraste XMLs de Mar/2025 aqui ou clique para selecionar"*.
+- Aceita arrastar arquivos `.xml` individuais ou uma pasta inteira (via input `webkitdirectory` no botão de fallback).
+- O `reconcileMissing` é chamado **filtrando os ausentes apenas do mês selecionado** — XMLs que correspondem viram `ok`/`divergente`; XMLs que não baterem com nenhum ausente do mês entram como `nao_escriturado` (com sua data própria).
+- Toast: *"Mar/2025: 5 reconciliada(s), 1 sem correspondência"*.
+- Visual ativo no drag-over (borda vermelha Diretriz + fundo levemente colorido).
+- Quando "Todos" estiver selecionado, mantém o comportamento atual (botão simples "Adicionar XMLs" no header, reconciliando contra todos os ausentes).
 
 ---
 
 ### Detalhes técnicos
 
 **Arquivos alterados:**
-- `src/components/ResultsSection.tsx` — passa a gerenciar `results` e `summary` como estado interno (atualmente é só prop), expõe `onResultsChange` opcional ou trata via `useState` local inicializado pelas props. Adiciona:
-  - Header: novo `<input type="file" accept=".xml" multiple>` oculto + botão **"Adicionar XMLs"** (Plus icon) condicional a `summary.ausentes > 0`.
-  - Nova coluna **"Ações"** na tabela com botão lixeira por linha + `AlertDialog` para confirmação.
-  - Função `recomputeSummary(results)` que recalcula os 6 contadores.
-- `src/lib/confronto-engine.ts` — exportar nova função `reconcileMissing(currentResults, newXmlData)` que:
-  1. Filtra `currentResults` com `status === 'ausente_xml'`.
-  2. Para cada XML novo, tenta casar por `chNFe` ou `nNF + cnpjEmitente` com os ausentes.
-  3. Atualiza o registro existente in-place (status, valorXml, diferenca, chNFe) — `ok` se diff ≤ 0,01, senão `divergente`.
-  4. XMLs novos sem match viram registros `nao_escriturado` e são anexados.
-  5. Retorna `{ results, summary }` recalculado.
-- `src/routes/index.tsx` — não precisa mudar (Results já gerencia próprio estado), ou alternativamente passar callback `onResultsUpdate` para sincronizar o estado pai. Vou usar estado interno em ResultsSection para manter o componente autocontido.
 
-**UX detalhes:**
-- Coluna "Ações" alinhada à direita, largura mínima.
-- Tooltip "Excluir registro" no botão lixeira.
-- Botão "Adicionar XMLs" com loading enquanto parseia.
-- Toasts via `sonner` (já instalado) para feedback.
+- `src/components/ResultsSection.tsx`
+  - Novo helper `getMonthKey(data: string)` — extrai `"YYYY-MM"` de strings `"DD/MM/AAAA"` (e `"AAAA-MM-DDTHH:mm:ss"` para `dhEmi` de XML); registros sem data válida vão para chave `"sem-data"`.
+  - Novo helper `formatMonthLabel(key)` → `"Mar/2025"` (pt-BR, abreviado).
+  - Novo state `selectedMonth: string | 'todos'` (default `'todos'`).
+  - `useMemo` `monthsAvailable` — lista única ordenada de meses presentes em `results` com contagem.
+  - `useMemo` `resultsForMonth` — filtra `results` pelo mês selecionado (ou retorna todos).
+  - `useMemo` `summaryForMonth` — chama `recomputeSummary(resultsForMonth)` quando mês ≠ 'todos'; senão usa `summary` global.
+  - O `filtered` (filtro por status) passa a operar sobre `resultsForMonth`.
+  - Cards de resumo, filtros de status, tabela e botão "Exportar Excel" passam a usar `resultsForMonth`/`summaryForMonth`.
+  - **Linha de chips de mês** renderizada acima dos summary cards.
+  - **Dropzone**: novo componente inline com `onDragOver`/`onDragLeave`/`onDrop`, visível quando `selectedMonth !== 'todos' && summaryForMonth.ausentes > 0`. Reaproveita o input file existente e a função `handleXmlFiles`.
+  - Em `handleXmlFiles`, quando há mês selecionado, chama uma variante `reconcileMissingForMonth(results, xmlData, monthKey)` (ou passa o filtro como segundo argumento).
+
+- `src/lib/confronto-engine.ts`
+  - Refatorar `reconcileMissing` para aceitar parâmetro opcional `monthFilter?: (row: ConfrontoResult) => boolean`. Quando informado, só tenta reconciliar ausentes que satisfaçam o filtro; XMLs não-pareados ainda viram `nao_escriturado` (com sua data nativa).
+  - Exportar helper `getMonthKey` reusável.
+
+- `src/lib/export-excel.ts` — só recebe a lista filtrada que o componente já passa; nenhuma mudança interna necessária.
+
+**UX:**
+- Chips de mês usam o mesmo estilo dos chips de status (selecionado = `bg-diretriz-dark`).
+- Dropzone com `border-2 border-dashed border-diretriz-red/30`, hover/drag = `border-diretriz-red bg-diretriz-red/5`.
+- Ícone `CalendarDays` (lucide) ao lado do label do mês selecionado, `Upload` na dropzone.
+- Loading spinner no drop enquanto parseia.
 
