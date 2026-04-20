@@ -1,55 +1,51 @@
 
 
-# Confronto NF-e — Diretriz Contabilidade
+## Melhorias na tela de Resultados
 
-Aplicação web para confrontar XMLs de NF-e com planilhas de Registro de Entrada ICMS, identificando notas OK, divergentes e ausentes.
+Duas melhorias na seção de resultados do confronto:
 
-## Branding
-- Cores da Diretriz: vermelho primário `#ED3237`, azul escuro `#10143D`
-- Interface profissional, tema claro, com identidade visual alinhada à marca
+### 1. Botão "Adicionar XMLs Avulsos" (resolve "Ausentes no XML")
 
-## Dependência
-- Adicionar **SheetJS (xlsx)** para leitura de .xlsx e .xlsb no browser
+Quando existirem registros com status **"Ausente no XML"** (NF lançada na planilha mas o XML não estava no lote inicial — geralmente porque foi emitida fora do prazo), aparecerá um botão para enviar XMLs avulsos sem precisar refazer toda a análise.
 
-## Tela 1 — Upload e Configuração
-- Dois cards lado a lado:
-  - **Esquerdo**: Upload de múltiplos XMLs (drag & drop + botão), com contador
-  - **Direito**: Upload de planilha .xlsx/.xlsb, com nome do arquivo
-- Após upload da planilha: **dropdown para selecionar aba** (auto-detecta a aba com dados de NF se possível)
-- Botão "Processar Confronto" habilitado quando ambos estiverem preenchidos
-- Loading spinner durante processamento
+**Comportamento:**
+- Botão **"Adicionar XMLs"** no topo da seção de resultados (ao lado de "Exportar Excel" / "Nova Análise"), visível quando houver pelo menos 1 ausente.
+- Abre seletor de arquivos `.xml` (múltiplos).
+- Os XMLs novos são parseados e re-confrontados **apenas contra os registros atualmente "ausente_xml"**, mantendo todos os demais resultados intactos.
+- Cada match transforma o registro de `ausente_xml` em `ok` (ou `divergente` se houver diferença de valor) e os contadores do resumo são recalculados.
+- XMLs novos que não baterem com nenhum ausente entram como `nao_escriturado`.
+- Toast informando: "X notas reconciliadas, Y XMLs sem correspondência".
 
-## Parsing dos XMLs (client-side, DOMParser)
-Extrair: chNFe (44 dígitos), nNF, série, dhEmi/dEmi, CNPJ emitente, xNome, vNF, vBC, vICMS, vBCST, vST, vIPI, vPIS, vCOFINS, vProd
+### 2. Botão de excluir linha (resolve divergências por nota cancelada)
 
-## Parsing do Excel (SheetJS)
-- Suporte a .xlsx e .xlsb
-- Detecção automática da linha de header (busca por "Nº NF", "Chave", "CNPJ", "Valor" etc.)
-- Mapeamento de colunas: Número NF, Série, Data, CNPJ, Nome Emitente, Chave NF-e, Valor Total, vBC, vICMS, vST
+Cada linha da tabela ganha um pequeno botão **lixeira** (ícone) na última coluna, para o usuário descartar manualmente registros que sabe serem inválidos (nota cancelada, lançamento duplicado, etc.).
 
-## Motor de Confronto
-- Match primário por chNFe (44 dígitos exatos)
-- Fallback por nNF + CNPJ emitente
-- Classificações:
-  - ✅ **OK** — chave bate, diferença ≤ R$0,01
-  - ⚠️ **Divergente** — chave encontrada, valor diverge > R$0,01
-  - ❌ **Ausente no XML** — linha da planilha sem XML correspondente
-  - 🔵 **Não escriturado** — XML sem correspondência na planilha
+**Comportamento:**
+- Ícone discreto (Trash2 do lucide-react), aparece em todas as linhas.
+- Ao clicar abre um `AlertDialog` de confirmação ("Excluir este registro do confronto?") para evitar exclusão acidental.
+- Confirmado: remove o registro do array `results` e recalcula `summary` (totais + contadores por status).
+- A exclusão é apenas **na sessão atual** (não persiste no banco). A exportação para Excel reflete o estado já filtrado.
 
-## Tela 2 — Resultados
-- **Cards de resumo** no topo: total planilha, total XMLs, OK, divergentes, ausentes, não escriturados
-- **Filtros por status** (chips clicáveis: Todos / OK / Divergente / Ausente / Não escriturado)
-- **Tabela** com colunas: Status (badge colorido), Nº NF, Série, Data, CNPJ, Nome Emitente, Valor Planilha, Valor XML, Diferença, Chave NF-e (truncada com tooltip)
-- Linhas alternadas para legibilidade
-- **Botão "Exportar Excel"** — gera .xlsx com resultado completo via SheetJS
-- **Botão "Nova análise"** — volta à Tela 1
+---
 
-## Estrutura de Arquivos
-- `src/routes/index.tsx` — página principal com estado de navegação Upload ↔ Resultado
-- `src/components/UploadSection.tsx` — cards de upload
-- `src/components/ResultsSection.tsx` — tabela e resumo
-- `src/lib/xml-parser.ts` — parsing de XMLs
-- `src/lib/excel-parser.ts` — parsing da planilha com SheetJS
-- `src/lib/confronto-engine.ts` — lógica de confronto
-- `src/lib/export-excel.ts` — exportação do resultado
+### Detalhes técnicos
+
+**Arquivos alterados:**
+- `src/components/ResultsSection.tsx` — passa a gerenciar `results` e `summary` como estado interno (atualmente é só prop), expõe `onResultsChange` opcional ou trata via `useState` local inicializado pelas props. Adiciona:
+  - Header: novo `<input type="file" accept=".xml" multiple>` oculto + botão **"Adicionar XMLs"** (Plus icon) condicional a `summary.ausentes > 0`.
+  - Nova coluna **"Ações"** na tabela com botão lixeira por linha + `AlertDialog` para confirmação.
+  - Função `recomputeSummary(results)` que recalcula os 6 contadores.
+- `src/lib/confronto-engine.ts` — exportar nova função `reconcileMissing(currentResults, newXmlData)` que:
+  1. Filtra `currentResults` com `status === 'ausente_xml'`.
+  2. Para cada XML novo, tenta casar por `chNFe` ou `nNF + cnpjEmitente` com os ausentes.
+  3. Atualiza o registro existente in-place (status, valorXml, diferenca, chNFe) — `ok` se diff ≤ 0,01, senão `divergente`.
+  4. XMLs novos sem match viram registros `nao_escriturado` e são anexados.
+  5. Retorna `{ results, summary }` recalculado.
+- `src/routes/index.tsx` — não precisa mudar (Results já gerencia próprio estado), ou alternativamente passar callback `onResultsUpdate` para sincronizar o estado pai. Vou usar estado interno em ResultsSection para manter o componente autocontido.
+
+**UX detalhes:**
+- Coluna "Ações" alinhada à direita, largura mínima.
+- Tooltip "Excluir registro" no botão lixeira.
+- Botão "Adicionar XMLs" com loading enquanto parseia.
+- Toasts via `sonner` (já instalado) para feedback.
 
