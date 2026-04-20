@@ -15,9 +15,27 @@ export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
   };
 }
 
+/**
+ * Extracts a YYYY-MM key from a date string.
+ * Accepts "DD/MM/AAAA", "DD/MM/AAAA HH:mm", and ISO "AAAA-MM-DDTHH:mm:ss".
+ * Returns "sem-data" when no valid date can be parsed.
+ */
+export function getMonthKey(data: string | null | undefined): string {
+  if (!data) return 'sem-data';
+  const s = String(data).trim();
+  // ISO format YYYY-MM-DD...
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-\d{2}/);
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}`;
+  // BR format DD/MM/AAAA
+  const brMatch = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (brMatch) return `${brMatch[3]}-${brMatch[2]}`;
+  return 'sem-data';
+}
+
 export function reconcileMissing(
   currentResults: ConfrontoResult[],
-  newXmlData: XmlNfeData[]
+  newXmlData: XmlNfeData[],
+  monthFilter?: (row: ConfrontoResult) => boolean
 ): { results: ConfrontoResult[]; summary: ConfrontoSummary; matched: number; unmatched: number } {
   const results = [...currentResults];
   let matched = 0;
@@ -26,6 +44,7 @@ export function reconcileMissing(
   for (let i = 0; i < results.length; i++) {
     const row = results[i];
     if (row.status !== 'ausente_xml') continue;
+    if (monthFilter && !monthFilter(row)) continue;
 
     const xmlIdx = newXmlData.findIndex((xml, idx) => {
       if (usedXmlIdx.has(idx)) return false;
