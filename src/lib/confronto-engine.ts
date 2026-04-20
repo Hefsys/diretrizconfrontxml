@@ -4,6 +4,76 @@ function cleanCnpj(v: string): string {
   return v.replace(/[.\-\/\s]/g, '');
 }
 
+export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
+  return {
+    totalPlanilha: results.filter((r) => r.valorPlanilha !== null).length,
+    totalXmls: results.filter((r) => r.valorXml !== null).length,
+    ok: results.filter((r) => r.status === 'ok').length,
+    divergentes: results.filter((r) => r.status === 'divergente').length,
+    ausentes: results.filter((r) => r.status === 'ausente_xml').length,
+    naoEscriturados: results.filter((r) => r.status === 'nao_escriturado').length,
+  };
+}
+
+export function reconcileMissing(
+  currentResults: ConfrontoResult[],
+  newXmlData: XmlNfeData[]
+): { results: ConfrontoResult[]; summary: ConfrontoSummary; matched: number; unmatched: number } {
+  const results = [...currentResults];
+  let matched = 0;
+  const usedXmlIdx = new Set<number>();
+
+  for (let i = 0; i < results.length; i++) {
+    const row = results[i];
+    if (row.status !== 'ausente_xml') continue;
+
+    const xmlIdx = newXmlData.findIndex((xml, idx) => {
+      if (usedXmlIdx.has(idx)) return false;
+      if (row.chNFe && row.chNFe.length === 44 && xml.chNFe === row.chNFe) return true;
+      if (row.nNF && row.cnpjEmitente && xml.nNF === row.nNF
+        && cleanCnpj(xml.cnpjEmitente) === cleanCnpj(row.cnpjEmitente)) return true;
+      return false;
+    });
+
+    if (xmlIdx === -1) continue;
+    usedXmlIdx.add(xmlIdx);
+    const xml = newXmlData[xmlIdx];
+    const planilhaVal = row.valorPlanilha ?? 0;
+    const diff = Math.abs(planilhaVal - xml.vNF);
+    results[i] = {
+      ...row,
+      status: diff <= 0.01 ? 'ok' : 'divergente',
+      valorXml: xml.vNF,
+      diferenca: diff > 0.01 ? planilhaVal - xml.vNF : 0,
+      chNFe: xml.chNFe || row.chNFe,
+      nomeEmitente: row.nomeEmitente || xml.xNome,
+    };
+    matched++;
+  }
+
+  // Unmatched XMLs become "nao_escriturado"
+  let unmatched = 0;
+  for (let i = 0; i < newXmlData.length; i++) {
+    if (usedXmlIdx.has(i)) continue;
+    const xml = newXmlData[i];
+    results.push({
+      status: 'nao_escriturado',
+      nNF: xml.nNF,
+      serie: xml.serie,
+      data: xml.dhEmi,
+      cnpjEmitente: xml.cnpjEmitente,
+      nomeEmitente: xml.xNome,
+      valorPlanilha: null,
+      valorXml: xml.vNF,
+      diferenca: null,
+      chNFe: xml.chNFe,
+    });
+    unmatched++;
+  }
+
+  return { results, summary: recomputeSummary(results), matched, unmatched };
+}
+
 export function runConfronto(
   excelData: ExcelNfeData[],
   xmlData: XmlNfeData[]

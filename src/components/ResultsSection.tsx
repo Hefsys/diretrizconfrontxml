@@ -1,13 +1,19 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { ConfrontoResult, ConfrontoSummary, ConfrontoStatus } from '@/lib/types';
 import { exportResults } from '@/lib/export-excel';
 
@@ -41,8 +47,13 @@ function formatCnpj(v: string): string {
   return v;
 }
 
-export function ResultsSection({ results, summary, onReset }: ResultsSectionProps) {
+export function ResultsSection({ results: initialResults, summary: initialSummary, onReset }: ResultsSectionProps) {
+  const [results, setResults] = useState<ConfrontoResult[]>(initialResults);
+  const [summary, setSummary] = useState<ConfrontoSummary>(initialSummary);
   const [filter, setFilter] = useState<FilterType>('todos');
+  const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
+  const [isAddingXmls, setIsAddingXmls] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(
     () => (filter === 'todos' ? results : results.filter((r) => r.status === filter)),
@@ -57,17 +68,72 @@ export function ResultsSection({ results, summary, onReset }: ResultsSectionProp
     { key: 'nao_escriturado', label: '🔵 Não escriturado', count: summary.naoEscriturados },
   ];
 
+  const handleAddXmlsClick = () => fileInputRef.current?.click();
+
+  const handleXmlFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    setIsAddingXmls(true);
+    try {
+      const { parseXmlFiles } = await import('@/lib/xml-parser');
+      const { reconcileMissing } = await import('@/lib/confronto-engine');
+      const xmlData = await parseXmlFiles(files);
+      const { results: newResults, summary: newSummary, matched, unmatched } = reconcileMissing(results, xmlData);
+      setResults(newResults);
+      setSummary(newSummary);
+      toast.success(`${matched} nota(s) reconciliada(s)`, {
+        description: unmatched > 0 ? `${unmatched} XML(s) sem correspondência adicionado(s) como "Não escriturado"` : undefined,
+      });
+    } catch (err) {
+      console.error('Erro ao adicionar XMLs:', err);
+      toast.error('Falha ao processar XMLs');
+    } finally {
+      setIsAddingXmls(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deleteIdx === null) return;
+    const rowToDelete = filtered[deleteIdx];
+    const realIdx = results.indexOf(rowToDelete);
+    if (realIdx === -1) {
+      setDeleteIdx(null);
+      return;
+    }
+    const { recomputeSummary } = await import('@/lib/confronto-engine');
+    const newResults = results.filter((_, i) => i !== realIdx);
+    setResults(newResults);
+    setSummary(recomputeSummary(newResults));
+    setDeleteIdx(null);
+    toast.success('Registro removido');
+  };
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-diretriz-dark">Resultado do Confronto</h1>
           <p className="text-sm text-muted-foreground">
             {results.length} registros processados
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xml"
+            multiple
+            className="hidden"
+            onChange={handleXmlFiles}
+          />
+          {summary.ausentes > 0 && (
+            <Button variant="outline" onClick={handleAddXmlsClick} disabled={isAddingXmls}>
+              {isAddingXmls ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Adicionar XMLs
+            </Button>
+          )}
           <Button variant="outline" onClick={() => exportResults(results)}>
             Exportar Excel
           </Button>
@@ -122,6 +188,7 @@ export function ResultsSection({ results, summary, onReset }: ResultsSectionProp
                     <TableHead className="text-right">Valor XML</TableHead>
                     <TableHead className="text-right">Diferença</TableHead>
                     <TableHead>Chave NF-e</TableHead>
+                    <TableHead className="w-[60px] text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -165,12 +232,27 @@ export function ResultsSection({ results, summary, onReset }: ResultsSectionProp
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeleteIdx(i)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="left">Excluir registro</TooltipContent>
+                          </Tooltip>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
                   {filtered.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
+                      <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
                         Nenhum registro encontrado para este filtro.
                       </TableCell>
                     </TableRow>
@@ -181,6 +263,23 @@ export function ResultsSection({ results, summary, onReset }: ResultsSectionProp
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteIdx !== null} onOpenChange={(open) => !open && setDeleteIdx(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir este registro do confronto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação remove o registro apenas desta sessão e dos resultados exportados. Use para descartar notas canceladas ou lançamentos inválidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
