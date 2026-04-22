@@ -289,13 +289,14 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-7">
         <SummaryCard label="Total Planilha" value={summaryForMonth.totalPlanilha} />
         <SummaryCard label="Total XMLs" value={summaryForMonth.totalXmls} />
         <SummaryCard label="OK" value={summaryForMonth.ok} color="text-emerald-600" />
         <SummaryCard label="Divergentes" value={summaryForMonth.divergentes} color="text-amber-600" />
         <SummaryCard label="Ausentes" value={summaryForMonth.ausentes} color="text-red-600" />
         <SummaryCard label="Não escriturados" value={summaryForMonth.naoEscriturados} color="text-blue-600" />
+        <SummaryCard label="Canceladas" value={summaryForMonth.canceladas} color="text-zinc-600" />
       </div>
 
       {/* Filter Chips */}
