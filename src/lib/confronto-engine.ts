@@ -77,7 +77,7 @@ export function reconcileMissing(
     if (usedXmlIdx.has(i)) continue;
     const xml = newXmlData[i];
     results.push({
-      status: 'nao_escriturado',
+      status: xml.cancelada ? 'cancelada' : 'nao_escriturado',
       nNF: xml.nNF,
       serie: xml.serie,
       data: xml.dhEmi,
