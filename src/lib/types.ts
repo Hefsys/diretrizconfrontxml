@@ -56,4 +56,5 @@ export interface ConfrontoSummary {
   divergentes: number;
   ausentes: number;
   naoEscriturados: number;
+  canceladas: number;
 }
