@@ -14,6 +14,7 @@ export interface XmlNfeData {
   vPIS: number;
   vCOFINS: number;
   vProd: number;
+  cancelada: boolean;
 }
 
 export interface ExcelNfeData {
