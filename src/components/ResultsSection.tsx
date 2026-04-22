@@ -29,6 +29,7 @@ const STATUS_CONFIG: Record<ConfrontoStatus, { label: string; color: string; emo
   divergente: { label: 'Divergente', color: 'bg-amber-100 text-amber-800 border-amber-200', emoji: '⚠️' },
   ausente_xml: { label: 'Ausente no XML', color: 'bg-red-100 text-red-800 border-red-200', emoji: '❌' },
   nao_escriturado: { label: 'Não escriturado', color: 'bg-blue-100 text-blue-800 border-blue-200', emoji: '🔵' },
+  cancelada: { label: 'Cancelada', color: 'bg-zinc-200 text-zinc-700 border-zinc-300', emoji: '🚫' },
 };
 
 type FilterType = 'todos' | ConfrontoStatus;
