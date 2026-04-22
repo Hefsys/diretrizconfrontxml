@@ -62,9 +62,9 @@ export function reconcileMissing(
     const diff = Math.abs(planilhaVal - xml.vNF);
     results[i] = {
       ...row,
-      status: diff <= 0.01 ? 'ok' : 'divergente',
+      status: xml.cancelada ? 'cancelada' : (diff <= 0.01 ? 'ok' : 'divergente'),
       valorXml: xml.vNF,
-      diferenca: diff > 0.01 ? planilhaVal - xml.vNF : 0,
+      diferenca: xml.cancelada ? null : (diff > 0.01 ? planilhaVal - xml.vNF : 0),
       chNFe: xml.chNFe || row.chNFe,
       nomeEmitente: row.nomeEmitente || xml.xNome,
     };
