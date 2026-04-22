@@ -11,6 +11,22 @@ function getNumber(parent: Element | null, tag: string): number {
   return isNaN(val) ? 0 : val;
 }
 
+function isXmlCancelada(doc: Document): boolean {
+  // Check protNFe > infProt > cStat === '101'
+  const infProts = doc.getElementsByTagName('infProt');
+  for (let i = 0; i < infProts.length; i++) {
+    if (getText(infProts[i], 'cStat') === '101') return true;
+  }
+  // Check procEventoNFe / infEvento with tpEvento 110111 and cStat 135/155
+  const infEventos = doc.getElementsByTagName('infEvento');
+  for (let i = 0; i < infEventos.length; i++) {
+    const tpEvento = getText(infEventos[i], 'tpEvento');
+    const cStat = getText(infEventos[i], 'cStat');
+    if (tpEvento === '110111' && (cStat === '135' || cStat === '155')) return true;
+  }
+  return false;
+}
+
 export function parseXmlNfe(xmlString: string): XmlNfeData | null {
   try {
     const parser = new DOMParser();
@@ -54,6 +70,7 @@ export function parseXmlNfe(xmlString: string): XmlNfeData | null {
       vPIS: getNumber(icmsTot, 'vPIS'),
       vCOFINS: getNumber(icmsTot, 'vCOFINS'),
       vProd: getNumber(icmsTot, 'vProd'),
+      cancelada: isXmlCancelada(doc),
     };
   } catch {
     return null;
