@@ -12,6 +12,7 @@ export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
     divergentes: results.filter((r) => r.status === 'divergente').length,
     ausentes: results.filter((r) => r.status === 'ausente_xml').length,
     naoEscriturados: results.filter((r) => r.status === 'nao_escriturado').length,
+    canceladas: results.filter((r) => r.status === 'cancelada').length,
   };
 }
 
@@ -61,9 +62,9 @@ export function reconcileMissing(
     const diff = Math.abs(planilhaVal - xml.vNF);
     results[i] = {
       ...row,
-      status: diff <= 0.01 ? 'ok' : 'divergente',
+      status: xml.cancelada ? 'cancelada' : (diff <= 0.01 ? 'ok' : 'divergente'),
       valorXml: xml.vNF,
-      diferenca: diff > 0.01 ? planilhaVal - xml.vNF : 0,
+      diferenca: xml.cancelada ? null : (diff > 0.01 ? planilhaVal - xml.vNF : 0),
       chNFe: xml.chNFe || row.chNFe,
       nomeEmitente: row.nomeEmitente || xml.xNome,
     };
@@ -76,7 +77,7 @@ export function reconcileMissing(
     if (usedXmlIdx.has(i)) continue;
     const xml = newXmlData[i];
     results.push({
-      status: 'nao_escriturado',
+      status: xml.cancelada ? 'cancelada' : 'nao_escriturado',
       nNF: xml.nNF,
       serie: xml.serie,
       data: xml.dhEmi,
@@ -134,7 +135,7 @@ export function runConfronto(
       matchedXmlKeys.add(matchedXml.chNFe || `${matchedXml.nNF}_${cleanCnpj(matchedXml.cnpjEmitente)}`);
       const diff = Math.abs(row.valorContabil - matchedXml.vNF);
       results.push({
-        status: diff <= 0.01 ? 'ok' : 'divergente',
+        status: matchedXml.cancelada ? 'cancelada' : (diff <= 0.01 ? 'ok' : 'divergente'),
         nNF: row.nNF,
         serie: row.serie,
         data: row.dataDocumento || row.dataEntrada,
@@ -142,7 +143,7 @@ export function runConfronto(
         nomeEmitente: row.nomeEmitente || matchedXml.xNome,
         valorPlanilha: row.valorContabil,
         valorXml: matchedXml.vNF,
-        diferenca: diff > 0.01 ? row.valorContabil - matchedXml.vNF : 0,
+        diferenca: matchedXml.cancelada ? null : (diff > 0.01 ? row.valorContabil - matchedXml.vNF : 0),
         chNFe: matchedXml.chNFe,
         sheetName: row.sheetName,
       });
@@ -168,7 +169,7 @@ export function runConfronto(
     const key = xml.chNFe || `${xml.nNF}_${cleanCnpj(xml.cnpjEmitente)}`;
     if (!matchedXmlKeys.has(key)) {
       results.push({
-        status: 'nao_escriturado',
+        status: xml.cancelada ? 'cancelada' : 'nao_escriturado',
         nNF: xml.nNF,
         serie: xml.serie,
         data: xml.dhEmi,
@@ -189,6 +190,7 @@ export function runConfronto(
     divergentes: results.filter((r) => r.status === 'divergente').length,
     ausentes: results.filter((r) => r.status === 'ausente_xml').length,
     naoEscriturados: results.filter((r) => r.status === 'nao_escriturado').length,
+    canceladas: results.filter((r) => r.status === 'cancelada').length,
   };
 
   return { results, summary };

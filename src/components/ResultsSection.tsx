@@ -29,6 +29,7 @@ const STATUS_CONFIG: Record<ConfrontoStatus, { label: string; color: string; emo
   divergente: { label: 'Divergente', color: 'bg-amber-100 text-amber-800 border-amber-200', emoji: '⚠️' },
   ausente_xml: { label: 'Ausente no XML', color: 'bg-red-100 text-red-800 border-red-200', emoji: '❌' },
   nao_escriturado: { label: 'Não escriturado', color: 'bg-blue-100 text-blue-800 border-blue-200', emoji: '🔵' },
+  cancelada: { label: 'Cancelada', color: 'bg-zinc-200 text-zinc-700 border-zinc-300', emoji: '🚫' },
 };
 
 type FilterType = 'todos' | ConfrontoStatus;
@@ -104,6 +105,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
       divergentes: resultsForMonth.filter((r) => r.status === 'divergente').length,
       ausentes: resultsForMonth.filter((r) => r.status === 'ausente_xml').length,
       naoEscriturados: resultsForMonth.filter((r) => r.status === 'nao_escriturado').length,
+      canceladas: resultsForMonth.filter((r) => r.status === 'cancelada').length,
     };
   }, [resultsForMonth, selectedMonth, summary]);
 
@@ -118,6 +120,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     { key: 'divergente', label: '⚠️ Divergente', count: summaryForMonth.divergentes },
     { key: 'ausente_xml', label: '❌ Ausente no XML', count: summaryForMonth.ausentes },
     { key: 'nao_escriturado', label: '🔵 Não escriturado', count: summaryForMonth.naoEscriturados },
+    { key: 'cancelada', label: '🚫 Cancelada', count: summaryForMonth.canceladas },
   ];
 
   const handleAddXmlsClick = () => fileInputRef.current?.click();
@@ -286,13 +289,14 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-7">
         <SummaryCard label="Total Planilha" value={summaryForMonth.totalPlanilha} />
         <SummaryCard label="Total XMLs" value={summaryForMonth.totalXmls} />
         <SummaryCard label="OK" value={summaryForMonth.ok} color="text-emerald-600" />
         <SummaryCard label="Divergentes" value={summaryForMonth.divergentes} color="text-amber-600" />
         <SummaryCard label="Ausentes" value={summaryForMonth.ausentes} color="text-red-600" />
         <SummaryCard label="Não escriturados" value={summaryForMonth.naoEscriturados} color="text-blue-600" />
+        <SummaryCard label="Canceladas" value={summaryForMonth.canceladas} color="text-zinc-600" />
       </div>
 
       {/* Filter Chips */}

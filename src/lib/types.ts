@@ -14,6 +14,7 @@ export interface XmlNfeData {
   vPIS: number;
   vCOFINS: number;
   vProd: number;
+  cancelada: boolean;
 }
 
 export interface ExcelNfeData {
@@ -32,7 +33,7 @@ export interface ExcelNfeData {
   sheetName: string;
 }
 
-export type ConfrontoStatus = 'ok' | 'divergente' | 'ausente_xml' | 'nao_escriturado';
+export type ConfrontoStatus = 'ok' | 'divergente' | 'ausente_xml' | 'nao_escriturado' | 'cancelada';
 
 export interface ConfrontoResult {
   status: ConfrontoStatus;
@@ -55,4 +56,5 @@ export interface ConfrontoSummary {
   divergentes: number;
   ausentes: number;
   naoEscriturados: number;
+  canceladas: number;
 }
