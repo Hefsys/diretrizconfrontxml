@@ -12,6 +12,7 @@ export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
     divergentes: results.filter((r) => r.status === 'divergente').length,
     ausentes: results.filter((r) => r.status === 'ausente_xml').length,
     naoEscriturados: results.filter((r) => r.status === 'nao_escriturado').length,
+    canceladas: results.filter((r) => r.status === 'cancelada').length,
   };
 }
 
