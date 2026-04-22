@@ -169,7 +169,7 @@ export function runConfronto(
     const key = xml.chNFe || `${xml.nNF}_${cleanCnpj(xml.cnpjEmitente)}`;
     if (!matchedXmlKeys.has(key)) {
       results.push({
-        status: 'nao_escriturado',
+        status: xml.cancelada ? 'cancelada' : 'nao_escriturado',
         nNF: xml.nNF,
         serie: xml.serie,
         data: xml.dhEmi,
@@ -190,6 +190,7 @@ export function runConfronto(
     divergentes: results.filter((r) => r.status === 'divergente').length,
     ausentes: results.filter((r) => r.status === 'ausente_xml').length,
     naoEscriturados: results.filter((r) => r.status === 'nao_escriturado').length,
+    canceladas: results.filter((r) => r.status === 'cancelada').length,
   };
 
   return { results, summary };
