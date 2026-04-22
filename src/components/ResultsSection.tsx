@@ -105,6 +105,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
       divergentes: resultsForMonth.filter((r) => r.status === 'divergente').length,
       ausentes: resultsForMonth.filter((r) => r.status === 'ausente_xml').length,
       naoEscriturados: resultsForMonth.filter((r) => r.status === 'nao_escriturado').length,
+      canceladas: resultsForMonth.filter((r) => r.status === 'cancelada').length,
     };
   }, [resultsForMonth, selectedMonth, summary]);
 
@@ -119,6 +120,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     { key: 'divergente', label: '⚠️ Divergente', count: summaryForMonth.divergentes },
     { key: 'ausente_xml', label: '❌ Ausente no XML', count: summaryForMonth.ausentes },
     { key: 'nao_escriturado', label: '🔵 Não escriturado', count: summaryForMonth.naoEscriturados },
+    { key: 'cancelada', label: '🚫 Cancelada', count: summaryForMonth.canceladas },
   ];
 
   const handleAddXmlsClick = () => fileInputRef.current?.click();
