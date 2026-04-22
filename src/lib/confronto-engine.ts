@@ -135,7 +135,7 @@ export function runConfronto(
       matchedXmlKeys.add(matchedXml.chNFe || `${matchedXml.nNF}_${cleanCnpj(matchedXml.cnpjEmitente)}`);
       const diff = Math.abs(row.valorContabil - matchedXml.vNF);
       results.push({
-        status: diff <= 0.01 ? 'ok' : 'divergente',
+        status: matchedXml.cancelada ? 'cancelada' : (diff <= 0.01 ? 'ok' : 'divergente'),
         nNF: row.nNF,
         serie: row.serie,
         data: row.dataDocumento || row.dataEntrada,
@@ -143,7 +143,7 @@ export function runConfronto(
         nomeEmitente: row.nomeEmitente || matchedXml.xNome,
         valorPlanilha: row.valorContabil,
         valorXml: matchedXml.vNF,
-        diferenca: diff > 0.01 ? row.valorContabil - matchedXml.vNF : 0,
+        diferenca: matchedXml.cancelada ? null : (diff > 0.01 ? row.valorContabil - matchedXml.vNF : 0),
         chNFe: matchedXml.chNFe,
         sheetName: row.sheetName,
       });
