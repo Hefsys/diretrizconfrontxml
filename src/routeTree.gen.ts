@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as XmlsRouteImport } from './routes/xmls'
 import { Route as FechamentosRouteImport } from './routes/fechamentos'
 import { Route as EmpresasRouteImport } from './routes/empresas'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 
+const XmlsRoute = XmlsRouteImport.update({
+  id: '/xmls',
+  path: '/xmls',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FechamentosRoute = FechamentosRouteImport.update({
   id: '/fechamentos',
   path: '/fechamentos',
@@ -40,12 +46,14 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/empresas': typeof EmpresasRoute
   '/fechamentos': typeof FechamentosRoute
+  '/xmls': typeof XmlsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/empresas': typeof EmpresasRoute
   '/fechamentos': typeof FechamentosRoute
+  '/xmls': typeof XmlsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,14 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/empresas': typeof EmpresasRoute
   '/fechamentos': typeof FechamentosRoute
+  '/xmls': typeof XmlsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/empresas' | '/fechamentos'
+  fullPaths: '/' | '/auth' | '/empresas' | '/fechamentos' | '/xmls'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/empresas' | '/fechamentos'
-  id: '__root__' | '/' | '/auth' | '/empresas' | '/fechamentos'
+  to: '/' | '/auth' | '/empresas' | '/fechamentos' | '/xmls'
+  id: '__root__' | '/' | '/auth' | '/empresas' | '/fechamentos' | '/xmls'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,10 +76,18 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   EmpresasRoute: typeof EmpresasRoute
   FechamentosRoute: typeof FechamentosRoute
+  XmlsRoute: typeof XmlsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/xmls': {
+      id: '/xmls'
+      path: '/xmls'
+      fullPath: '/xmls'
+      preLoaderRoute: typeof XmlsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/fechamentos': {
       id: '/fechamentos'
       path: '/fechamentos'
@@ -107,6 +124,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   EmpresasRoute: EmpresasRoute,
   FechamentosRoute: FechamentosRoute,
+  XmlsRoute: XmlsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
