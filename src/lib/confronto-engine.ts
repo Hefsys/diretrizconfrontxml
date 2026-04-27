@@ -96,7 +96,8 @@ export function reconcileMissing(
 
 export function runConfronto(
   excelData: ExcelNfeData[],
-  xmlData: XmlNfeData[]
+  xmlData: XmlNfeData[],
+  cnpjsComIpi: Set<string> = new Set()
 ): { results: ConfrontoResult[]; summary: ConfrontoSummary } {
   const results: ConfrontoResult[] = [];
   const matchedXmlKeys = new Set<string>();
@@ -116,24 +117,26 @@ export function runConfronto(
   // Process each Excel row
   for (const row of excelData) {
     let matchedXml: XmlNfeData | undefined;
-    let matchKey = '';
 
     // Primary: match by chNFe
     if (row.chNFe && row.chNFe.length === 44) {
       matchedXml = xmlByChave.get(row.chNFe);
-      if (matchedXml) matchKey = matchedXml.chNFe;
     }
 
     // Fallback: match by nNF + CNPJ
     if (!matchedXml && row.nNF && row.cnpjEmitente) {
       const key = `${row.nNF}_${cleanCnpj(row.cnpjEmitente)}`;
       matchedXml = xmlByNnfCnpj.get(key);
-      if (matchedXml) matchKey = matchedXml.chNFe || key;
     }
 
     if (matchedXml) {
       matchedXmlKeys.add(matchedXml.chNFe || `${matchedXml.nNF}_${cleanCnpj(matchedXml.cnpjEmitente)}`);
-      const diff = Math.abs(row.valorContabil - matchedXml.vNF);
+      const cnpjKey = cleanCnpj(row.cnpjEmitente);
+      const somaIpi = cnpjsComIpi.has(cnpjKey);
+      const valorPlanilhaAjustado = somaIpi
+        ? row.valorContabil + (row.vIpiAA ?? 0) + (row.vIpiAR ?? 0)
+        : row.valorContabil;
+      const diff = Math.abs(valorPlanilhaAjustado - matchedXml.vNF);
       results.push({
         status: matchedXml.cancelada ? 'cancelada' : (diff <= 0.01 ? 'ok' : 'divergente'),
         nNF: row.nNF,
@@ -141,9 +144,9 @@ export function runConfronto(
         data: row.dataDocumento || row.dataEntrada,
         cnpjEmitente: row.cnpjEmitente,
         nomeEmitente: row.nomeEmitente || matchedXml.xNome,
-        valorPlanilha: row.valorContabil,
+        valorPlanilha: valorPlanilhaAjustado,
         valorXml: matchedXml.vNF,
-        diferenca: matchedXml.cancelada ? null : (diff > 0.01 ? row.valorContabil - matchedXml.vNF : 0),
+        diferenca: matchedXml.cancelada ? null : (diff > 0.01 ? valorPlanilhaAjustado - matchedXml.vNF : 0),
         chNFe: matchedXml.chNFe,
         sheetName: row.sheetName,
       });
@@ -183,15 +186,5 @@ export function runConfronto(
     }
   }
 
-  const summary: ConfrontoSummary = {
-    totalPlanilha: excelData.length,
-    totalXmls: xmlData.length,
-    ok: results.filter((r) => r.status === 'ok').length,
-    divergentes: results.filter((r) => r.status === 'divergente').length,
-    ausentes: results.filter((r) => r.status === 'ausente_xml').length,
-    naoEscriturados: results.filter((r) => r.status === 'nao_escriturado').length,
-    canceladas: results.filter((r) => r.status === 'cancelada').length,
-  };
-
-  return { results, summary };
+  return { results, summary: recomputeSummary(results) };
 }

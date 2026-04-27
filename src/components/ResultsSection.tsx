@@ -1,8 +1,9 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Loader2, Upload, CalendarDays } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Plus, Trash2, Loader2, Upload, CalendarDays, Search, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -17,11 +18,14 @@ import {
 import type { ConfrontoResult, ConfrontoSummary, ConfrontoStatus } from '@/lib/types';
 import { exportResults } from '@/lib/export-excel';
 import { getMonthKey } from '@/lib/confronto-engine';
+import { fecharMes, listarCompetenciasFechadas } from '@/lib/fechamentos';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ResultsSectionProps {
   results: ConfrontoResult[];
   summary: ConfrontoSummary;
   onReset: () => void;
+  empresaId?: string;
 }
 
 const STATUS_CONFIG: Record<ConfrontoStatus, { label: string; color: string; emoji: string }> = {
@@ -63,15 +67,26 @@ function formatCnpj(v: string): string {
   return v;
 }
 
-export function ResultsSection({ results: initialResults, summary: initialSummary, onReset }: ResultsSectionProps) {
+export function ResultsSection({ results: initialResults, summary: initialSummary, onReset, empresaId }: ResultsSectionProps) {
+  const { user } = useAuth();
   const [results, setResults] = useState<ConfrontoResult[]>(initialResults);
   const [summary, setSummary] = useState<ConfrontoSummary>(initialSummary);
   const [filter, setFilter] = useState<FilterType>('todos');
   const [selectedMonth, setSelectedMonth] = useState<MonthSelection>('todos');
+  const [searchNf, setSearchNf] = useState('');
   const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
   const [isAddingXmls, setIsAddingXmls] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [competenciasFechadas, setCompetenciasFechadas] = useState<Set<string>>(new Set());
+  const [isClosing, setIsClosing] = useState(false);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load list of closed competencies for this empresa
+  useEffect(() => {
+    if (!empresaId) return;
+    listarCompetenciasFechadas(empresaId).then(setCompetenciasFechadas);
+  }, [empresaId]);
 
   // Months available in the dataset, sorted chronologically with counts
   const monthsAvailable = useMemo(() => {
@@ -109,10 +124,39 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     };
   }, [resultsForMonth, selectedMonth, summary]);
 
-  const filtered = useMemo(
-    () => (filter === 'todos' ? resultsForMonth : resultsForMonth.filter((r) => r.status === filter)),
-    [resultsForMonth, filter]
-  );
+  const filtered = useMemo(() => {
+    let arr = filter === 'todos' ? resultsForMonth : resultsForMonth.filter((r) => r.status === filter);
+    const q = searchNf.trim();
+    if (q) arr = arr.filter((r) => r.nNF && r.nNF.includes(q));
+    return arr;
+  }, [resultsForMonth, filter, searchNf]);
+
+  const isMonthClosed = selectedMonth !== 'todos' && competenciasFechadas.has(selectedMonth);
+  const canCloseMonth = !!empresaId && !!user && selectedMonth !== 'todos' && !isMonthClosed;
+
+  const handleCloseMonth = async () => {
+    if (!empresaId || !user || selectedMonth === 'todos') return;
+    setIsClosing(true);
+    try {
+      const res = await fecharMes({
+        empresaId,
+        competencia: selectedMonth,
+        fechadoPor: user.id,
+        resumo: summaryForMonth,
+        resultados: resultsForMonth,
+      });
+      if (!res.ok) {
+        toast.error(res.error ?? 'Erro ao fechar mês');
+        return;
+      }
+      setCompetenciasFechadas((prev) => new Set(prev).add(selectedMonth));
+      exportResults(resultsForMonth);
+      toast.success(`Competência ${formatMonthLabel(selectedMonth)} fechada e Excel gerado.`);
+    } finally {
+      setIsClosing(false);
+      setConfirmCloseOpen(false);
+    }
+  };
 
   const filters: { key: FilterType; label: string; count: number }[] = [
     { key: 'todos', label: 'Todos', count: resultsForMonth.length },
@@ -222,6 +266,22 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
               Adicionar XMLs
             </Button>
           )}
+          {canCloseMonth && (
+            <Button
+              variant="outline"
+              onClick={() => setConfirmCloseOpen(true)}
+              disabled={isClosing}
+              className="border-diretriz-red/40 text-diretriz-red hover:bg-diretriz-red/5"
+            >
+              {isClosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+              Fechar mês
+            </Button>
+          )}
+          {isMonthClosed && (
+            <Badge variant="outline" className="border-diretriz-red/40 text-diretriz-red flex items-center gap-1 px-3">
+              <Lock className="h-3 w-3" /> Mês fechado
+            </Badge>
+          )}
           <Button variant="outline" onClick={() => exportResults(resultsForMonth)}>
             Exportar Excel
           </Button>
@@ -229,6 +289,18 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             Nova Análise
           </Button>
         </div>
+      </div>
+
+      {/* Search by NF number */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Buscar por nº da NF…"
+          value={searchNf}
+          onChange={(e) => setSearchNf(e.target.value)}
+          className="pl-9"
+        />
       </div>
 
       {/* Month chips */}
@@ -245,19 +317,23 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
           >
             Todos ({results.length})
           </button>
-          {monthsAvailable.map((m) => (
-            <button
-              key={m.key}
-              onClick={() => setSelectedMonth(m.key)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                selectedMonth === m.key
-                  ? 'border-diretriz-dark bg-diretriz-dark text-white'
-                  : 'border-border bg-background text-foreground hover:bg-muted'
-              }`}
-            >
-              {formatMonthLabel(m.key)} ({m.count})
-            </button>
-          ))}
+          {monthsAvailable.map((m) => {
+            const closed = competenciasFechadas.has(m.key);
+            return (
+              <button
+                key={m.key}
+                onClick={() => setSelectedMonth(m.key)}
+                className={`flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  selectedMonth === m.key
+                    ? 'border-diretriz-dark bg-diretriz-dark text-white'
+                    : 'border-border bg-background text-foreground hover:bg-muted'
+                }`}
+              >
+                {closed && <Lock className="h-3 w-3" />}
+                {formatMonthLabel(m.key)} ({m.count})
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -422,6 +498,25 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fechar competência {selectedMonth !== 'todos' && formatMonthLabel(selectedMonth)}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação congela o resultado da competência para esta empresa e gera o Excel de fechamento.
+              O mês não poderá mais ser reaberto, e tentativas futuras de fechar a mesma competência serão bloqueadas.
+              Todas as {resultsForMonth.length} linhas (OK, divergentes, ausentes, não escriturados e canceladas) serão salvas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClosing}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCloseMonth} disabled={isClosing} className="bg-diretriz-red text-white hover:bg-diretriz-red/90">
+              {isClosing ? 'Fechando…' : 'Fechar e gerar Excel'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
