@@ -27,6 +27,7 @@ export type Database = {
           inscricao_estadual: string | null
           nome_fantasia: string | null
           razao_social: string
+          soma_ipi_dealernet: boolean
           telefone: string | null
           uf: string | null
           updated_at: string
@@ -43,6 +44,7 @@ export type Database = {
           inscricao_estadual?: string | null
           nome_fantasia?: string | null
           razao_social: string
+          soma_ipi_dealernet?: boolean
           telefone?: string | null
           uf?: string | null
           updated_at?: string
@@ -59,11 +61,50 @@ export type Database = {
           inscricao_estadual?: string | null
           nome_fantasia?: string | null
           razao_social?: string
+          soma_ipi_dealernet?: boolean
           telefone?: string | null
           uf?: string | null
           updated_at?: string
         }
         Relationships: []
+      }
+      fechamentos_mensais: {
+        Row: {
+          competencia: string
+          empresa_id: string
+          fechado_em: string
+          fechado_por: string | null
+          id: string
+          resultados: Json
+          resumo: Json
+        }
+        Insert: {
+          competencia: string
+          empresa_id: string
+          fechado_em?: string
+          fechado_por?: string | null
+          id?: string
+          resultados: Json
+          resumo: Json
+        }
+        Update: {
+          competencia?: string
+          empresa_id?: string
+          fechado_em?: string
+          fechado_por?: string | null
+          id?: string
+          resultados?: Json
+          resumo?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fechamentos_mensais_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -115,6 +156,68 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      xmls_armazenados: {
+        Row: {
+          cancelada: boolean
+          ch_nfe: string
+          cnpj_emitente: string | null
+          created_at: string
+          dh_emi: string | null
+          empresa_id: string
+          id: string
+          n_nf: string | null
+          serie: string | null
+          updated_at: string
+          uploaded_by: string | null
+          v_ipi: number | null
+          v_nf: number | null
+          x_nome: string | null
+          xml_data: Json
+        }
+        Insert: {
+          cancelada?: boolean
+          ch_nfe: string
+          cnpj_emitente?: string | null
+          created_at?: string
+          dh_emi?: string | null
+          empresa_id: string
+          id?: string
+          n_nf?: string | null
+          serie?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+          v_ipi?: number | null
+          v_nf?: number | null
+          x_nome?: string | null
+          xml_data: Json
+        }
+        Update: {
+          cancelada?: boolean
+          ch_nfe?: string
+          cnpj_emitente?: string | null
+          created_at?: string
+          dh_emi?: string | null
+          empresa_id?: string
+          id?: string
+          n_nf?: string | null
+          serie?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+          v_ipi?: number | null
+          v_nf?: number | null
+          x_nome?: string | null
+          xml_data?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "xmls_armazenados_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
