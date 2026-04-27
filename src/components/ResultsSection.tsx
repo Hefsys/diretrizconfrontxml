@@ -1,8 +1,9 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Loader2, Upload, CalendarDays } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Plus, Trash2, Loader2, Upload, CalendarDays, Search, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -17,11 +18,14 @@ import {
 import type { ConfrontoResult, ConfrontoSummary, ConfrontoStatus } from '@/lib/types';
 import { exportResults } from '@/lib/export-excel';
 import { getMonthKey } from '@/lib/confronto-engine';
+import { fecharMes, listarCompetenciasFechadas } from '@/lib/fechamentos';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ResultsSectionProps {
   results: ConfrontoResult[];
   summary: ConfrontoSummary;
   onReset: () => void;
+  empresaId?: string;
 }
 
 const STATUS_CONFIG: Record<ConfrontoStatus, { label: string; color: string; emoji: string }> = {
@@ -63,15 +67,26 @@ function formatCnpj(v: string): string {
   return v;
 }
 
-export function ResultsSection({ results: initialResults, summary: initialSummary, onReset }: ResultsSectionProps) {
+export function ResultsSection({ results: initialResults, summary: initialSummary, onReset, empresaId }: ResultsSectionProps) {
+  const { user } = useAuth();
   const [results, setResults] = useState<ConfrontoResult[]>(initialResults);
   const [summary, setSummary] = useState<ConfrontoSummary>(initialSummary);
   const [filter, setFilter] = useState<FilterType>('todos');
   const [selectedMonth, setSelectedMonth] = useState<MonthSelection>('todos');
+  const [searchNf, setSearchNf] = useState('');
   const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
   const [isAddingXmls, setIsAddingXmls] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [competenciasFechadas, setCompetenciasFechadas] = useState<Set<string>>(new Set());
+  const [isClosing, setIsClosing] = useState(false);
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load list of closed competencies for this empresa
+  useEffect(() => {
+    if (!empresaId) return;
+    listarCompetenciasFechadas(empresaId).then(setCompetenciasFechadas);
+  }, [empresaId]);
 
   // Months available in the dataset, sorted chronologically with counts
   const monthsAvailable = useMemo(() => {
