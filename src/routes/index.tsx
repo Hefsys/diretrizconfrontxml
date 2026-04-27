@@ -5,7 +5,9 @@ import type { ConfrontoResult, ConfrontoSummary } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
+import { toast } from 'sonner';
 import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
+import { supabase } from '@/integrations/supabase/client';
 
 export const Route = createFileRoute('/')({
   head: () => ({
@@ -25,6 +27,7 @@ function Index() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<ConfrontoResult[]>([]);
   const [summary, setSummary] = useState<ConfrontoSummary | null>(null);
+  const [empresaId, setEmpresaId] = useState<string>('');
   const [UploadComp, setUploadComp] = useState<ComponentType<any> | null>(null);
   const [ResultsComp, setResultsComp] = useState<ComponentType<any> | null>(null);
 
@@ -45,31 +48,68 @@ function Index() {
     }
   }, [authLoading, user, navigate]);
 
-  const handleProcess = useCallback(async (xmlFiles: File[], workbook: WorkBook, selectedSheets: string[]) => {
+  const handleProcess = useCallback(async (xmlFiles: File[], workbook: WorkBook, selectedSheets: string[], empId: string) => {
     setIsProcessing(true);
     try {
       const { parseXmlFiles } = await import('@/lib/xml-parser');
       const { parseSheet } = await import('@/lib/excel-parser');
       const { runConfronto } = await import('@/lib/confronto-engine');
+      const { salvarXmls, carregarXmlsDaEmpresa, mesclarXmls } = await import('@/lib/xml-storage');
 
-      const xmlData = await parseXmlFiles(xmlFiles);
+      // 1. Parse uploaded XMLs
+      const novosXmls = await parseXmlFiles(xmlFiles);
+
+      // 2. Save new XMLs to the company's database
+      let salvos = 0;
+      if (novosXmls.length > 0 && user) {
+        salvos = await salvarXmls(empId, user.id, novosXmls);
+      }
+
+      // 3. Load all stored XMLs for this company and merge
+      const historicoXmls = await carregarXmlsDaEmpresa(empId);
+      const todosXmls = mesclarXmls(novosXmls, historicoXmls);
+
+      // 4. Load CNPJs that require IPI sum
+      const { data: empresasIpi } = await supabase
+        .from('empresas')
+        .select('cnpj')
+        .eq('soma_ipi_dealernet', true)
+        .eq('ativo', true);
+      const cnpjsComIpi = new Set<string>(
+        (empresasIpi ?? []).map((e) => String(e.cnpj).replace(/[.\-\/\s]/g, ''))
+      );
+
+      // 5. Parse Excel and run confronto
       const allExcelData = selectedSheets.flatMap((sheet) => parseSheet(workbook, sheet));
-      const { results: r, summary: s } = runConfronto(allExcelData, xmlData);
+      const { results: r, summary: s } = runConfronto(allExcelData, todosXmls, cnpjsComIpi);
+
+      setEmpresaId(empId);
       setResults(r);
       setSummary(s);
       setView('results');
+
+      if (novosXmls.length > 0) {
+        toast.success(
+          `${salvos} novo(s) XML salvo(s) na base · ${historicoXmls.length} XML(s) histórico(s) considerados`
+        );
+      } else if (historicoXmls.length > 0) {
+        toast.info(`${historicoXmls.length} XML(s) da base histórica considerados`);
+      }
     } catch (err) {
       console.error('Processing error:', err);
+      toast.error('Erro ao processar confronto');
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [user]);
 
   const handleReset = useCallback(() => {
     setView('upload');
     setResults([]);
     setSummary(null);
+    setEmpresaId('');
   }, []);
+
 
   const headerEl = (
     <header className="border-b border-border bg-sidebar backdrop-blur-sm sticky top-0 z-50">
