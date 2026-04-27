@@ -209,6 +209,7 @@ function EmpresasPage() {
                   <TableHead>Razão Social</TableHead>
                   <TableHead>CNPJ</TableHead>
                   <TableHead>Cidade/UF</TableHead>
+                  <TableHead>IPI Dealernet</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -223,6 +224,13 @@ function EmpresasPage() {
                     <TableCell className="font-mono text-sm">{e.cnpj}</TableCell>
                     <TableCell className="text-sm">
                       {[e.cidade, e.uf].filter(Boolean).join(' / ') || '—'}
+                    </TableCell>
+                    <TableCell>
+                      {e.soma_ipi_dealernet ? (
+                        <Badge variant="outline" className="border-diretriz-red/40 text-diretriz-red">AA + AR</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant={e.ativo ? 'default' : 'secondary'}>
