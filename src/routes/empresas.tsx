@@ -170,6 +170,7 @@ function EmpresasPage() {
             <nav className="flex items-center gap-4 text-sm">
               <Link to="/" className="text-white/70 hover:text-white transition-colors">Confronto</Link>
               <Link to="/empresas" className="text-white font-medium">Empresas</Link>
+              <Link to="/xmls" className="text-white/70 hover:text-white transition-colors">XMLs</Link>
               <Link to="/fechamentos" className="text-white/70 hover:text-white transition-colors">Fechamentos</Link>
             </nav>
           </div>
