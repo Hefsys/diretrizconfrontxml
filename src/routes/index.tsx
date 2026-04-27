@@ -119,6 +119,7 @@ function Index() {
           <nav className="flex items-center gap-4 text-sm">
             <Link to="/" className="text-white font-medium">Confronto</Link>
             <Link to="/empresas" className="text-white/70 hover:text-white transition-colors">Empresas</Link>
+            <Link to="/fechamentos" className="text-white/70 hover:text-white transition-colors">Fechamentos</Link>
           </nav>
         </div>
         <div className="flex items-center gap-3">
@@ -150,7 +151,7 @@ function Index() {
         {view === 'upload' ? (
           <UploadComp onProcess={handleProcess} isProcessing={isProcessing} />
         ) : summary ? (
-          <ResultsComp results={results} summary={summary} onReset={handleReset} />
+          <ResultsComp results={results} summary={summary} onReset={handleReset} empresaId={empresaId} />
         ) : null}
       </main>
     </div>
