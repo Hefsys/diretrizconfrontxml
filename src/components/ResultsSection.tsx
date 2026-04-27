@@ -124,10 +124,39 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     };
   }, [resultsForMonth, selectedMonth, summary]);
 
-  const filtered = useMemo(
-    () => (filter === 'todos' ? resultsForMonth : resultsForMonth.filter((r) => r.status === filter)),
-    [resultsForMonth, filter]
-  );
+  const filtered = useMemo(() => {
+    let arr = filter === 'todos' ? resultsForMonth : resultsForMonth.filter((r) => r.status === filter);
+    const q = searchNf.trim();
+    if (q) arr = arr.filter((r) => r.nNF && r.nNF.includes(q));
+    return arr;
+  }, [resultsForMonth, filter, searchNf]);
+
+  const isMonthClosed = selectedMonth !== 'todos' && competenciasFechadas.has(selectedMonth);
+  const canCloseMonth = !!empresaId && !!user && selectedMonth !== 'todos' && !isMonthClosed;
+
+  const handleCloseMonth = async () => {
+    if (!empresaId || !user || selectedMonth === 'todos') return;
+    setIsClosing(true);
+    try {
+      const res = await fecharMes({
+        empresaId,
+        competencia: selectedMonth,
+        fechadoPor: user.id,
+        resumo: summaryForMonth,
+        resultados: resultsForMonth,
+      });
+      if (!res.ok) {
+        toast.error(res.error ?? 'Erro ao fechar mês');
+        return;
+      }
+      setCompetenciasFechadas((prev) => new Set(prev).add(selectedMonth));
+      exportResults(resultsForMonth);
+      toast.success(`Competência ${formatMonthLabel(selectedMonth)} fechada e Excel gerado.`);
+    } finally {
+      setIsClosing(false);
+      setConfirmCloseOpen(false);
+    }
+  };
 
   const filters: { key: FilterType; label: string; count: number }[] = [
     { key: 'todos', label: 'Todos', count: resultsForMonth.length },
