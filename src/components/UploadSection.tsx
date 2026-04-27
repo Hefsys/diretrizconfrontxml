@@ -1,12 +1,20 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { WorkBook } from 'xlsx';
 import { readWorkbook, getSheetNames, autoDetectSheet } from '@/lib/excel-parser';
+import { supabase } from '@/integrations/supabase/client';
+import { Building2 } from 'lucide-react';
+
+interface EmpresaOpt {
+  id: string;
+  razao_social: string;
+  cnpj: string;
+}
 
 interface UploadSectionProps {
-  onProcess: (xmlFiles: File[], workbook: WorkBook, selectedSheets: string[]) => void;
+  onProcess: (xmlFiles: File[], workbook: WorkBook, selectedSheets: string[], empresaId: string) => void;
   isProcessing: boolean;
 }
 
@@ -16,9 +24,22 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
   const [excelFileName, setExcelFileName] = useState('');
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
+  const [empresas, setEmpresas] = useState<EmpresaOpt[]>([]);
+  const [empresaId, setEmpresaId] = useState<string>('');
   const xmlInputRef = useRef<HTMLInputElement>(null);
   const xmlFolderInputRef = useRef<HTMLInputElement>(null);
   const excelInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    supabase
+      .from('empresas')
+      .select('id, razao_social, cnpj')
+      .eq('ativo', true)
+      .order('razao_social', { ascending: true })
+      .then(({ data }) => {
+        if (data) setEmpresas(data as EmpresaOpt[]);
+      });
+  }, []);
 
   const handleXmlDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -50,7 +71,7 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
     );
   };
 
-  const canProcess = xmlFiles.length > 0 && workbook && selectedSheets.length > 0;
+  const canProcess = !!empresaId && workbook && selectedSheets.length > 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -60,6 +81,33 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
           Confronte XMLs de NF-e com o Registro de Entrada ICMS
         </p>
       </div>
+
+      {/* Empresa selector */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Building2 className="h-4 w-4 text-diretriz-red" />
+            Empresa <span className="text-destructive">*</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Select value={empresaId} onValueChange={setEmpresaId}>
+            <SelectTrigger className="max-w-md">
+              <SelectValue placeholder={empresas.length === 0 ? 'Nenhuma empresa cadastrada' : 'Selecione a empresa…'} />
+            </SelectTrigger>
+            <SelectContent>
+              {empresas.map((e) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.razao_social} <span className="text-xs text-muted-foreground">· {e.cnpj}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Os XMLs ficam armazenados por empresa. NFs de meses anteriores são reutilizadas automaticamente.
+          </p>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* XML Upload Card */}
@@ -73,7 +121,7 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-diretriz-red/10 text-sm font-bold text-diretriz-red">
                 XML
               </span>
-              XMLs das NF-e
+              XMLs das NF-e <span className="text-xs font-normal text-muted-foreground">(opcional se já houver base)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -205,7 +253,7 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
         <Button
           size="lg"
           disabled={!canProcess || isProcessing}
-          onClick={() => workbook && onProcess(xmlFiles, workbook, selectedSheets)}
+          onClick={() => workbook && empresaId && onProcess(xmlFiles, workbook, selectedSheets, empresaId)}
           className="bg-diretriz-red px-8 text-white hover:bg-diretriz-red/90 disabled:opacity-50"
         >
           {isProcessing ? (
