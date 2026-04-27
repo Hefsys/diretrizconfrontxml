@@ -48,6 +48,7 @@ interface Empresa {
   cidade: string | null;
   uf: string | null;
   ativo: boolean;
+  soma_ipi_dealernet: boolean;
   created_by: string | null;
 }
 
@@ -134,6 +135,7 @@ function EmpresasPage() {
       endereco: parsed.data.endereco || null,
       cidade: parsed.data.cidade || null,
       uf: parsed.data.uf?.toUpperCase() || null,
+      soma_ipi_dealernet: fd.get('soma_ipi_dealernet') === 'on',
     };
 
     let result;
@@ -168,6 +170,7 @@ function EmpresasPage() {
             <nav className="flex items-center gap-4 text-sm">
               <Link to="/" className="text-white/70 hover:text-white transition-colors">Confronto</Link>
               <Link to="/empresas" className="text-white font-medium">Empresas</Link>
+              <Link to="/fechamentos" className="text-white/70 hover:text-white transition-colors">Fechamentos</Link>
             </nav>
           </div>
           <div className="flex items-center gap-3">
