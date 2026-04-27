@@ -142,6 +142,13 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     const valorStr = colMap.valorContabil >= 0 ? row[colMap.valorContabil] : 0;
     const valor = typeof valorStr === 'number' ? valorStr : parseFloat(String(valorStr).replace(/[^\d,.\-]/g, '').replace(',', '.')) || 0;
 
+    // Read AA (index 26) and AR (index 43) by absolute column position
+    const parseCell = (v: unknown): number => {
+      if (typeof v === 'number') return v;
+      const s = String(v ?? '').replace(/[^\d,.\-]/g, '').replace(',', '.');
+      return parseFloat(s) || 0;
+    };
+
     results.push({
       nNF,
       serie: colMap.serie >= 0 ? String(row[colMap.serie] ?? '').trim() : '',
@@ -151,9 +158,11 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
       nomeEmitente: colMap.nome >= 0 ? String(row[colMap.nome] ?? '').trim() : '',
       chNFe: colMap.chNFe >= 0 ? String(row[colMap.chNFe] ?? '').replace(/\D/g, '') : '',
       valorContabil: valor,
-      vBC: colMap.vBC >= 0 ? (typeof row[colMap.vBC] === 'number' ? row[colMap.vBC] as number : parseFloat(String(row[colMap.vBC]).replace(',', '.')) || 0) : 0,
-      vICMS: colMap.vICMS >= 0 ? (typeof row[colMap.vICMS] === 'number' ? row[colMap.vICMS] as number : parseFloat(String(row[colMap.vICMS]).replace(',', '.')) || 0) : 0,
-      vST: colMap.vST >= 0 ? (typeof row[colMap.vST] === 'number' ? row[colMap.vST] as number : parseFloat(String(row[colMap.vST]).replace(',', '.')) || 0) : 0,
+      vBC: colMap.vBC >= 0 ? parseCell(row[colMap.vBC]) : 0,
+      vICMS: colMap.vICMS >= 0 ? parseCell(row[colMap.vICMS]) : 0,
+      vST: colMap.vST >= 0 ? parseCell(row[colMap.vST]) : 0,
+      vIpiAA: parseCell(row[26]),
+      vIpiAR: parseCell(row[43]),
       rowIndex: i,
       sheetName,
     });

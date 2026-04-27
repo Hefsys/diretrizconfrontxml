@@ -29,8 +29,36 @@ export interface ExcelNfeData {
   vBC: number;
   vICMS: number;
   vST: number;
+  vIpiAA: number;
+  vIpiAR: number;
   rowIndex: number;
   sheetName: string;
+}
+
+export interface Empresa {
+  id: string;
+  razao_social: string;
+  cnpj: string;
+  soma_ipi_dealernet: boolean;
+  ativo: boolean;
+}
+
+export interface XmlArmazenado {
+  id: string;
+  empresa_id: string;
+  ch_nfe: string;
+  xml_data: XmlNfeData;
+  created_at: string;
+}
+
+export interface FechamentoMensal {
+  id: string;
+  empresa_id: string;
+  competencia: string;
+  fechado_por: string | null;
+  fechado_em: string;
+  resumo: ConfrontoSummary;
+  resultados: ConfrontoResult[];
 }
 
 export type ConfrontoStatus = 'ok' | 'divergente' | 'ausente_xml' | 'nao_escriturado' | 'cancelada';
