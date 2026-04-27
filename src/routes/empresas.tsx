@@ -285,6 +285,23 @@ function EmpresasPage() {
                 <Label htmlFor="uf">UF</Label>
                 <Input id="uf" name="uf" maxLength={2} defaultValue={editing?.uf ?? ''} />
               </div>
+              <div className="sm:col-span-2 flex items-start gap-3 rounded-md border border-border p-3 bg-muted/30">
+                <input
+                  id="soma_ipi_dealernet"
+                  name="soma_ipi_dealernet"
+                  type="checkbox"
+                  defaultChecked={editing?.soma_ipi_dealernet ?? false}
+                  className="mt-1 h-4 w-4 rounded border-border accent-diretriz-red"
+                />
+                <div className="flex-1">
+                  <Label htmlFor="soma_ipi_dealernet" className="cursor-pointer">
+                    Somar IPI da planilha Dealernet (colunas AA + AR) ao Valor Contábil
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Marque para emitentes cujo XML inclui o IPI no valor total da NF (ex.: Disnove). O confronto somará automaticamente as colunas AA e AR ao Valor Contábil antes de comparar com o XML.
+                  </p>
+                </div>
+              </div>
             </div>
             {formError && <p className="text-sm text-destructive">{formError}</p>}
             <div className="flex justify-end gap-2 pt-2">
