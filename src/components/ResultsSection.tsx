@@ -266,6 +266,22 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
               Adicionar XMLs
             </Button>
           )}
+          {canCloseMonth && (
+            <Button
+              variant="outline"
+              onClick={() => setConfirmCloseOpen(true)}
+              disabled={isClosing}
+              className="border-diretriz-red/40 text-diretriz-red hover:bg-diretriz-red/5"
+            >
+              {isClosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+              Fechar mês
+            </Button>
+          )}
+          {isMonthClosed && (
+            <Badge variant="outline" className="border-diretriz-red/40 text-diretriz-red flex items-center gap-1 px-3">
+              <Lock className="h-3 w-3" /> Mês fechado
+            </Badge>
+          )}
           <Button variant="outline" onClick={() => exportResults(resultsForMonth)}>
             Exportar Excel
           </Button>
@@ -273,6 +289,18 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             Nova Análise
           </Button>
         </div>
+      </div>
+
+      {/* Search by NF number */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Buscar por nº da NF…"
+          value={searchNf}
+          onChange={(e) => setSearchNf(e.target.value)}
+          className="pl-9"
+        />
       </div>
 
       {/* Month chips */}
@@ -289,19 +317,23 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
           >
             Todos ({results.length})
           </button>
-          {monthsAvailable.map((m) => (
-            <button
-              key={m.key}
-              onClick={() => setSelectedMonth(m.key)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                selectedMonth === m.key
-                  ? 'border-diretriz-dark bg-diretriz-dark text-white'
-                  : 'border-border bg-background text-foreground hover:bg-muted'
-              }`}
-            >
-              {formatMonthLabel(m.key)} ({m.count})
-            </button>
-          ))}
+          {monthsAvailable.map((m) => {
+            const closed = competenciasFechadas.has(m.key);
+            return (
+              <button
+                key={m.key}
+                onClick={() => setSelectedMonth(m.key)}
+                className={`flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  selectedMonth === m.key
+                    ? 'border-diretriz-dark bg-diretriz-dark text-white'
+                    : 'border-border bg-background text-foreground hover:bg-muted'
+                }`}
+              >
+                {closed && <Lock className="h-3 w-3" />}
+                {formatMonthLabel(m.key)} ({m.count})
+              </button>
+            );
+          })}
         </div>
       )}
 
