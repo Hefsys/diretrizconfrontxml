@@ -13,8 +13,10 @@ export async function fecharMes(params: {
     empresa_id: empresaId,
     competencia,
     fechado_por: fechadoPor,
-    resumo: resumo as unknown as Record<string, unknown>,
-    resultados: resultados as unknown as Record<string, unknown>[],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resumo: resumo as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resultados: resultados as any,
   });
   if (error) {
     if (error.message.toLowerCase().includes('duplicate')) {
