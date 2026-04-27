@@ -9,10 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as FechamentosRouteImport } from './routes/fechamentos'
 import { Route as EmpresasRouteImport } from './routes/empresas'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 
+const FechamentosRoute = FechamentosRouteImport.update({
+  id: '/fechamentos',
+  path: '/fechamentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EmpresasRoute = EmpresasRouteImport.update({
   id: '/empresas',
   path: '/empresas',
@@ -33,34 +39,45 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/empresas': typeof EmpresasRoute
+  '/fechamentos': typeof FechamentosRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/empresas': typeof EmpresasRoute
+  '/fechamentos': typeof FechamentosRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/empresas': typeof EmpresasRoute
+  '/fechamentos': typeof FechamentosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/empresas'
+  fullPaths: '/' | '/auth' | '/empresas' | '/fechamentos'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/empresas'
-  id: '__root__' | '/' | '/auth' | '/empresas'
+  to: '/' | '/auth' | '/empresas' | '/fechamentos'
+  id: '__root__' | '/' | '/auth' | '/empresas' | '/fechamentos'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   EmpresasRoute: typeof EmpresasRoute
+  FechamentosRoute: typeof FechamentosRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/fechamentos': {
+      id: '/fechamentos'
+      path: '/fechamentos'
+      fullPath: '/fechamentos'
+      preLoaderRoute: typeof FechamentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/empresas': {
       id: '/empresas'
       path: '/empresas'
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   EmpresasRoute: EmpresasRoute,
+  FechamentosRoute: FechamentosRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
