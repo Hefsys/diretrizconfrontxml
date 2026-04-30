@@ -130,8 +130,7 @@ export function runConfronto(
 
     if (matchedXml) {
       matchedXmlKeys.add(matchedXml.chNFe || `${matchedXml.nNF}_${cleanCnpj(matchedXml.cnpjEmitente)}`);
-      const cnpjKey = cleanCnpj(row.cnpjEmitente);
-      const somaIpi = cnpjsComIpi.has(cnpjKey);
+      const somaIpi = (matchedXml.vIPI ?? 0) > 0;
       const valorPlanilhaAjustado = somaIpi
         ? row.valorContabil + (row.vIpiAA ?? 0) + (row.vIpiAR ?? 0)
         : row.valorContabil;
