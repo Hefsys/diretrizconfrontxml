@@ -29,8 +29,6 @@ export interface ExcelNfeData {
   vBC: number;
   vICMS: number;
   vST: number;
-  vIpiAA: number;
-  vIpiAR: number;
   rowIndex: number;
   sheetName: string;
 }

@@ -58,11 +58,7 @@ export function reconcileMissing(
     if (xmlIdx === -1) continue;
     usedXmlIdx.add(xmlIdx);
     const xml = newXmlData[xmlIdx];
-    const somaIpi = (xml.vIPI ?? 0) > 0;
-    const planilhaVal = (row.valorPlanilha ?? 0); // already adjusted upstream when from runConfronto
-    // Note: in this reconcile path the planilha value was stored as-is from the original row
-    // and may not include IPI even when the XML has IPI. We keep the existing comparison
-    // behavior here — full IPI handling happens in runConfronto where raw row data is available.
+    const planilhaVal = (row.valorPlanilha ?? 0);
     const diff = Math.abs(planilhaVal - xml.vNF);
     results[i] = {
       ...row,
@@ -72,7 +68,6 @@ export function reconcileMissing(
       chNFe: xml.chNFe || row.chNFe,
       nomeEmitente: row.nomeEmitente || xml.xNome,
     };
-    void somaIpi;
     matched++;
   }
 
@@ -135,11 +130,10 @@ export function runConfronto(
 
     if (matchedXml) {
       matchedXmlKeys.add(matchedXml.chNFe || `${matchedXml.nNF}_${cleanCnpj(matchedXml.cnpjEmitente)}`);
-      const somaIpi = (matchedXml.vIPI ?? 0) > 0;
-      const valorPlanilhaAjustado = somaIpi
-        ? row.valorContabil + (row.vIpiAA ?? 0) + (row.vIpiAR ?? 0)
-        : row.valorContabil;
-      const diff = Math.abs(valorPlanilhaAjustado - matchedXml.vNF);
+      // Coluna Valor Contábil da planilha RFS008 já é o Valor Total da NF (com IPI/ST embutidos).
+      // Comparação é sempre direta — nunca somar colunas extras.
+      const valorPlanilha = row.valorContabil;
+      const diff = Math.abs(valorPlanilha - matchedXml.vNF);
       results.push({
         status: matchedXml.cancelada ? 'cancelada' : (diff <= 0.01 ? 'ok' : 'divergente'),
         nNF: row.nNF,
@@ -147,9 +141,9 @@ export function runConfronto(
         data: row.dataDocumento || row.dataEntrada,
         cnpjEmitente: row.cnpjEmitente,
         nomeEmitente: row.nomeEmitente || matchedXml.xNome,
-        valorPlanilha: valorPlanilhaAjustado,
+        valorPlanilha,
         valorXml: matchedXml.vNF,
-        diferenca: matchedXml.cancelada ? null : (diff > 0.01 ? valorPlanilhaAjustado - matchedXml.vNF : 0),
+        diferenca: matchedXml.cancelada ? null : (diff > 0.01 ? valorPlanilha - matchedXml.vNF : 0),
         chNFe: matchedXml.chNFe,
         sheetName: row.sheetName,
       });

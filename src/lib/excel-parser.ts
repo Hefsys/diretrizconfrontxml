@@ -142,7 +142,6 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     const valorStr = colMap.valorContabil >= 0 ? row[colMap.valorContabil] : 0;
     const valor = typeof valorStr === 'number' ? valorStr : parseFloat(String(valorStr).replace(/[^\d,.\-]/g, '').replace(',', '.')) || 0;
 
-    // Read AA (index 26) and AR (index 43) by absolute column position
     const parseCell = (v: unknown): number => {
       if (typeof v === 'number') return v;
       const s = String(v ?? '').replace(/[^\d,.\-]/g, '').replace(',', '.');
@@ -161,8 +160,6 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
       vBC: colMap.vBC >= 0 ? parseCell(row[colMap.vBC]) : 0,
       vICMS: colMap.vICMS >= 0 ? parseCell(row[colMap.vICMS]) : 0,
       vST: colMap.vST >= 0 ? parseCell(row[colMap.vST]) : 0,
-      vIpiAA: parseCell(row[26]),
-      vIpiAR: parseCell(row[43]),
       rowIndex: i,
       sheetName,
     });
