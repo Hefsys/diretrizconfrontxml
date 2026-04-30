@@ -96,8 +96,7 @@ export function reconcileMissing(
 
 export function runConfronto(
   excelData: ExcelNfeData[],
-  xmlData: XmlNfeData[],
-  cnpjsComIpi: Set<string> = new Set()
+  xmlData: XmlNfeData[]
 ): { results: ConfrontoResult[]; summary: ConfrontoSummary } {
   const results: ConfrontoResult[] = [];
   const matchedXmlKeys = new Set<string>();
