@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
-import { supabase } from '@/integrations/supabase/client';
+
 
 export const Route = createFileRoute('/')({
   head: () => ({
