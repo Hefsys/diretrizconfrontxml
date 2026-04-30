@@ -69,7 +69,7 @@ function Index() {
       const historicoXmls = await carregarXmlsDaEmpresa(empId);
       const todosXmls = mesclarXmls(novosXmls, historicoXmls);
 
-      // 4. Parse Excel and run confronto (IPI is summed per-NF when XML has vIPI > 0)
+      // 4. Parse Excel and run confronto — Valor Contábil da planilha já é o Valor Total da NF
       const allExcelData = selectedSheets.flatMap((sheet) => parseSheet(workbook, sheet));
       const { results: r, summary: s } = runConfronto(allExcelData, todosXmls);
 
