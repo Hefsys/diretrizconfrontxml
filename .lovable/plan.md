@@ -1,77 +1,50 @@
-## Melhorias: Disnove (IPI), busca, fechamento de mês e base persistente de XMLs
 
-Quatro melhorias integradas. Como o usuário já decidiu nas perguntas anteriores: **CNPJ da Disnove fica como flag por empresa** (mais flexível), **upload passa a exigir seleção da empresa** e o **fechamento congela TODAS as linhas** (OK + divergentes + canceladas + ausentes + não escriturados) com seus status finais.
+## Problema
 
----
+Hoje, na hora de comparar o **valor contábil da planilha (RFS008)** com o **vNF do XML**, o sistema soma o IPI das colunas AA e AR da planilha em **todas** as NFs de qualquer fornecedor que esteja marcado como "Soma IPI Dealernet" na empresa. Isso gera divergências falsas porque:
 
-### 1. IPI Disnove — somar colunas AA + AR ao Valor Contábil
+- Nem toda NF do mesmo fornecedor tem IPI.
+- A especificação enviada deixa claro que a soma do IPI só se aplica quando a **própria NF tem IPI** (ex.: regras OK NF 02, OK NF 06, etc., só disparam quando `IPI_XML > 0`).
 
-A planilha do Dealernet traz IPI em colunas separadas. Para emitentes específicos (Disnove), o `vNF` do XML inclui o IPI, então o confronto precisa somar essas colunas.
+## Regra correta (por NF, não por CNPJ)
 
-- **Cadastro de empresas:** novo campo `soma_ipi_dealernet` (boolean, default `false`). Aparece como switch no formulário de empresa em `/empresas` ("Somar IPI da planilha Dealernet (colunas AA + AR) ao valor contábil").
-- **Excel parser:** ler também as colunas AA (índice 26) e AR (índice 43) por posição absoluta — independente de cabeçalho — e armazenar em `vIpiAA` e `vIpiAR` no `ExcelNfeData`.
-- **Engine:** ao casar uma linha, se o emitente da NF (CNPJ) corresponder a uma empresa cadastrada com `soma_ipi_dealernet = true`, comparar `valorContabil + vIpiAA + vIpiAR` contra `vNF`; caso contrário, comparar `valorContabil` direto (comportamento atual).
-- O confronto recebe um `Set<string>` de CNPJs com a flag ativa, montado em tempo de processamento.
+Para cada linha da planilha, ao comparar com o XML:
 
-### 2. Campo de busca por número de NF
+- Se `vIPI` do XML for **> 0** → comparar `valorContabil + vIpiAA + vIpiAR` com `vNF` do XML.
+- Se `vIPI` do XML for **= 0** (ou ausente) → comparar `valorContabil` puro com `vNF` do XML.
 
-Input de texto na barra superior da tabela de Resultados (`ResultsSection.tsx`), ao lado dos chips de filtro. Filtragem em tempo real por `nNF` (substring), combinada com filtros de mês e status já existentes.
+Tolerância continua sendo `0,01` (igual à planilha original).
 
-### 3. Empresa obrigatória no upload + persistência de XMLs
+## Mudanças
 
-- **`UploadSection`:** novo `<Select>` no topo carregando empresas ativas do banco. Botão "Processar" desabilitado até uma empresa ser escolhida.
-- **Tabela `xmls_armazenados`** (nova) com RLS por empresa:
-  ```
-  id uuid pk, empresa_id uuid not null fk empresas, ch_nfe text not null,
-  n_nf text, serie text, dh_emi text, cnpj_emitente text, x_nome text,
-  v_nf numeric, v_ipi numeric, cancelada boolean default false,
-  xml_data jsonb,                  -- payload completo parseado
-  uploaded_by uuid, created_at timestamptz default now(),
-  unique (empresa_id, ch_nfe)
-  ```
-- **Fluxo no processamento:**
-  1. XMLs novos do upload são inseridos (upsert por `empresa_id + ch_nfe` — duplicatas são ignoradas, não recarregadas).
-  2. Antes do confronto, o sistema busca **todos** os XMLs já armazenados daquela empresa e mescla com os recém-enviados. Isso resolve o cenário de "NF emitida em mês X, escriturada em X+1".
-- Cada upload subsequente acumula a base; o usuário pode reprocessar a planilha sem reanexar XMLs antigos.
+### 1. `src/lib/confronto-engine.ts`
+- Remover o parâmetro `cnpjsComIpi` da função `runConfronto`.
+- Trocar a regra `somaIpi = cnpjsComIpi.has(cnpjKey)` por `somaIpi = (matchedXml.vIPI ?? 0) > 0`.
+- Aplicar a mesma lógica também em `reconcileMissing` (reconciliação cross-month), que hoje compara direto sem somar IPI.
 
-### 4. Fechamento de mês — botão + relatório + histórico
+### 2. `src/routes/index.tsx`
+- Remover a query que busca empresas com `soma_ipi_dealernet = true` e o `Set<string> cnpjsComIpi`.
+- Chamar `runConfronto(allExcelData, todosXmls)` sem o terceiro argumento.
 
-- **Tabela `fechamentos_mensais`** (nova) com RLS por empresa:
-  ```
-  id uuid pk, empresa_id uuid not null fk empresas, competencia text not null, -- "2025-04"
-  fechado_por uuid, fechado_em timestamptz default now(),
-  resumo jsonb,            -- ConfrontoSummary
-  resultados jsonb,        -- ConfrontoResult[] congelados (todas as linhas, todos os status)
-  unique (empresa_id, competencia)
-  ```
-- **Botão "Fechar mês"** na tela de Resultados, visível apenas quando há mês selecionado (não em "Todos"). Pede confirmação ("o mês não poderá mais ser editado para esta empresa") e:
-  1. Persiste o snapshot completo (todas as linhas com seus status) em `fechamentos_mensais`.
-  2. Gera Excel com a lista completa via `exportResults` e dispara download.
-- **Indicador visual:** chips de mês mostram um cadeado quando a competência já está fechada para a empresa selecionada; tentar reabrir mostra mensagem "Mês fechado em DD/MM/AAAA por …".
-- **Nova rota `/fechamentos`** (link no header) listando fechamentos por empresa/competência, com botão para baixar novamente o Excel a partir do `resultados` salvo.
+### 3. `src/routes/empresas.tsx` (opcional, mas recomendado)
+- Manter o campo `soma_ipi_dealernet` no banco por compatibilidade, mas **ocultar** o checkbox no formulário e a coluna no card, já que não é mais usado pela lógica.
+- Alternativa: remover a UI por completo. Recomendo ocultar primeiro (sem migration) para não quebrar dados existentes — depois podemos dropar a coluna em outra etapa.
 
----
+### 4. Garantir que `vIPI` está sendo lido corretamente do XML
+- Já existe o campo `vIPI` em `XmlNfeData` (`src/lib/types.ts`) e o parser preenche.
+- Verificar rapidamente que o `xml-parser.ts` está somando o IPI de todos os itens (e/ou pegando do total) para que NFs com IPI tenham `vIPI > 0`. Se estiver inconsistente, ajustar.
 
-### Alterações de arquivos
+### 5. NFs já armazenadas no banco
+- Os XMLs salvos em `xmls_armazenados` guardam `xml_data` (jsonb) com o `vIPI` original, então a nova regra passa a valer automaticamente para reconciliações futuras — sem precisar de migration ou reprocessamento.
 
-**Banco (migrations):**
-- `empresas`: adicionar coluna `soma_ipi_dealernet boolean not null default false`.
-- Criar `xmls_armazenados` + RLS (select/insert/update por usuários autenticados da empresa, delete só admin).
-- Criar `fechamentos_mensais` + RLS (mesmas regras).
+## Comportamento depois da mudança
 
-**Front-end:**
-- `src/lib/types.ts` — adicionar `vIpiAA`, `vIpiAR` em `ExcelNfeData`; tipos `XmlArmazenado`, `FechamentoMensal`.
-- `src/lib/excel-parser.ts` — extrair colunas AA/AR por índice.
-- `src/lib/confronto-engine.ts` — receber `cnpjsComIpi: Set<string>` e ajustar comparação.
-- `src/lib/xml-storage.ts` (novo) — `salvarXmls`, `carregarXmlsDaEmpresa`, helpers de upsert.
-- `src/lib/fechamentos.ts` (novo) — `fecharMes`, `listarFechamentos`, `baixarFechamento`.
-- `src/components/UploadSection.tsx` — `<Select>` de empresa obrigatório.
-- `src/components/ResultsSection.tsx` — input de busca por nº NF, botão "Fechar mês", indicador de mês fechado.
-- `src/routes/index.tsx` — passar `empresaId` adiante; após processar, mesclar XMLs históricos.
-- `src/routes/empresas.tsx` — switch `soma_ipi_dealernet` no formulário.
-- `src/routes/fechamentos.tsx` (novo) — listagem + download de fechamentos anteriores.
+- NF com IPI no XML → comparação inclui IPI (AA + AR) automaticamente, em qualquer fornecedor.
+- NF sem IPI → comparação direta, sem somar nada.
+- Não depende mais de marcar o fornecedor como "Soma IPI Dealernet" — a decisão é por nota.
+- Falsas divergências em fornecedores marcados como "soma IPI" mas com NFs sem IPI desaparecem.
 
-### Observações importantes
+## Fora de escopo
 
-- Os arquivos XML em si **não** são guardados (só o conteúdo parseado em JSONB). Se quiser guardar o XML cru no Storage, posso adicionar — diga depois.
-- A flag IPI é por empresa (do **emitente**), não por empresa selecionada no upload — é o CNPJ da nota que decide se soma ou não. Se a Disnove ainda não estiver cadastrada como empresa, basta cadastrá-la com a flag ligada.
+- Implementar todos os status detalhados da especificação (OK NF 02, OK NF 04, OK NF 06, OK NF 06 VL ST, OK NF VD DIRETA, ERRORdat_Ent, Pessoa F., Transportes, CTE, etc.). Hoje o sistema só usa `ok / divergente / ausente_xml / nao_escriturado / cancelada`. Essa evolução é maior e merece um plano separado — se quiser, podemos seguir com ela depois.
+- Drop da coluna `soma_ipi_dealernet` no banco (deixar para limpeza futura).
