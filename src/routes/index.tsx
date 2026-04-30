@@ -69,19 +69,9 @@ function Index() {
       const historicoXmls = await carregarXmlsDaEmpresa(empId);
       const todosXmls = mesclarXmls(novosXmls, historicoXmls);
 
-      // 4. Load CNPJs that require IPI sum
-      const { data: empresasIpi } = await supabase
-        .from('empresas')
-        .select('cnpj')
-        .eq('soma_ipi_dealernet', true)
-        .eq('ativo', true);
-      const cnpjsComIpi = new Set<string>(
-        (empresasIpi ?? []).map((e) => String(e.cnpj).replace(/[.\-\/\s]/g, ''))
-      );
-
-      // 5. Parse Excel and run confronto
+      // 4. Parse Excel and run confronto (IPI is summed per-NF when XML has vIPI > 0)
       const allExcelData = selectedSheets.flatMap((sheet) => parseSheet(workbook, sheet));
-      const { results: r, summary: s } = runConfronto(allExcelData, todosXmls, cnpjsComIpi);
+      const { results: r, summary: s } = runConfronto(allExcelData, todosXmls);
 
       setEmpresaId(empId);
       setResults(r);
