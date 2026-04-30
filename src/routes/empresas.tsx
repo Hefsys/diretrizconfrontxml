@@ -227,13 +227,6 @@ function EmpresasPage() {
                       {[e.cidade, e.uf].filter(Boolean).join(' / ') || '—'}
                     </TableCell>
                     <TableCell>
-                      {e.soma_ipi_dealernet ? (
-                        <Badge variant="outline" className="border-diretriz-red/40 text-diretriz-red">AA + AR</Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
                       <Badge variant={e.ativo ? 'default' : 'secondary'}>
                         {e.ativo ? 'Ativo' : 'Inativo'}
                       </Badge>
