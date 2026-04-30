@@ -210,7 +210,7 @@ function EmpresasPage() {
                   <TableHead>Razão Social</TableHead>
                   <TableHead>CNPJ</TableHead>
                   <TableHead>Cidade/UF</TableHead>
-                  <TableHead>IPI Dealernet</TableHead>
+                  
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
