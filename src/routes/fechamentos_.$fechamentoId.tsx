@@ -126,12 +126,15 @@ function FechamentoDetailPage() {
           >
             <ArrowLeft className="h-4 w-4" /> Voltar para Fechamentos
           </Link>
+          {fechamento.titulo && (
+            <h1 className="mt-1 text-2xl font-semibold text-diretriz-dark">{fechamento.titulo}</h1>
+          )}
           <div className="mt-2 text-sm text-muted-foreground">
             <span className="font-medium text-diretriz-dark">{empresaNome || '—'}</span>
             {' · '}
             <span>Competência {formatMonthLabel(fechamento.competencia)}</span>
             {' · '}
-            <span>Fechado em {new Date(fechamento.fechado_em).toLocaleString('pt-BR')}</span>
+            <span>Salvo em {new Date(fechamento.fechado_em).toLocaleString('pt-BR')}</span>
           </div>
         </div>
 
