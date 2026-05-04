@@ -72,6 +72,7 @@ function formatCnpj(v: string): string {
 
 export function ResultsSection({ results: initialResults, summary: initialSummary, onReset, empresaId, readOnly = false, resetLabel }: ResultsSectionProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [results, setResults] = useState<ConfrontoResult[]>(initialResults);
   const [summary, setSummary] = useState<ConfrontoSummary>(initialSummary);
   const [filter, setFilter] = useState<FilterType>('todos');
