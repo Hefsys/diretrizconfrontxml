@@ -427,7 +427,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
                     <TableHead className="text-right">Valor XML</TableHead>
                     <TableHead className="text-right">Diferença</TableHead>
                     <TableHead>Chave NF-e</TableHead>
-                    <TableHead className="w-[60px] text-right">Ações</TableHead>
+                    {!readOnly && <TableHead className="w-[60px] text-right">Ações</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -471,27 +471,29 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                onClick={() => setDeleteIdx(i)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="left">Excluir registro</TooltipContent>
-                          </Tooltip>
-                        </TableCell>
+                        {!readOnly && (
+                          <TableCell className="text-right">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  onClick={() => setDeleteIdx(i)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="left">Excluir registro</TooltipContent>
+                            </Tooltip>
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
                   {filtered.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
+                      <TableCell colSpan={readOnly ? 10 : 11} className="py-8 text-center text-muted-foreground">
                         Nenhum registro encontrado para este filtro.
                       </TableCell>
                     </TableRow>
