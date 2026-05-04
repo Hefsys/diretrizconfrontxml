@@ -291,7 +291,8 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     toast.success('Registro removido');
   };
 
-  const showDropzone = !readOnly && selectedMonth !== 'todos' && summaryForMonth.ausentes > 0;
+  const canEditXmls = !readOnly || !!onUpdate;
+  const showDropzone = canEditXmls && selectedMonth !== 'todos' && summaryForMonth.ausentes > 0;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
