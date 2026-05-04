@@ -88,16 +88,12 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
   const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
   const [isAddingXmls, setIsAddingXmls] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [competenciasFechadas, setCompetenciasFechadas] = useState<Set<string>>(new Set());
+  const [competenciasFechadas] = useState<Set<string>>(new Set());
   const [isClosing, setIsClosing] = useState(false);
-  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveTitulo, setSaveTitulo] = useState('');
+  const [saveCompetencia, setSaveCompetencia] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Load list of closed competencies for this empresa
-  useEffect(() => {
-    if (!empresaId) return;
-    listarCompetenciasFechadas(empresaId).then(setCompetenciasFechadas);
-  }, [empresaId]);
 
   // Months available in the dataset, sorted chronologically with counts
   const monthsAvailable = useMemo(() => {
@@ -142,86 +138,63 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     return arr;
   }, [resultsForMonth, filter, searchNf]);
 
-  const isMonthClosed = selectedMonth !== 'todos' && competenciasFechadas.has(selectedMonth);
-
-  // Competências disponíveis nos resultados que ainda não foram fechadas (exclui "sem-data")
-  const competenciasSalvaveis = useMemo(
-    () =>
-      monthsAvailable
-        .map((m) => m.key)
-        .filter((k) => k !== 'sem-data' && !competenciasFechadas.has(k)),
-    [monthsAvailable, competenciasFechadas]
+  // Competências válidas para escolher como rótulo da análise (exclui "sem-data")
+  const competenciasOpcoes = useMemo(
+    () => monthsAvailable.map((m) => m.key).filter((k) => k !== 'sem-data'),
+    [monthsAvailable]
   );
 
-  const canSave = !!empresaId && !!user && !readOnly && (
-    selectedMonth === 'todos'
-      ? competenciasSalvaveis.length > 0
-      : !isMonthClosed && selectedMonth !== 'sem-data'
-  );
+  // Default da competência: mês selecionado, ou a mais frequente
+  const defaultCompetencia = useMemo(() => {
+    if (selectedMonth !== 'todos' && selectedMonth !== 'sem-data') return selectedMonth;
+    if (competenciasOpcoes.length === 0) return '';
+    let best = competenciasOpcoes[0];
+    let bestCount = 0;
+    for (const m of monthsAvailable) {
+      if (m.key === 'sem-data') continue;
+      if (m.count > bestCount) { best = m.key; bestCount = m.count; }
+    }
+    return best;
+  }, [selectedMonth, competenciasOpcoes, monthsAvailable]);
 
-  const handleCloseMonth = async () => {
+  const canSave = !!empresaId && !!user && !readOnly && results.length > 0 && competenciasOpcoes.length > 0;
+
+  const openSaveDialog = () => {
+    const comp = defaultCompetencia;
+    setSaveCompetencia(comp);
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
+    setSaveTitulo(comp ? `Análise ${formatMonthLabel(comp)} — ${dataAtual}` : `Análise — ${dataAtual}`);
+    setSaveDialogOpen(true);
+  };
+
+  const handleSaveAnalise = async () => {
     if (!empresaId || !user) return;
+    const titulo = saveTitulo.trim();
+    if (!titulo) {
+      toast.error('Informe um título para a análise');
+      return;
+    }
+    if (!saveCompetencia) {
+      toast.error('Selecione a competência');
+      return;
+    }
     setIsClosing(true);
     try {
-      // Determina quais competências salvar
-      const targets: string[] = selectedMonth === 'todos'
-        ? competenciasSalvaveis
-        : [selectedMonth];
-
-      let salvas = 0;
-      let jaFechadas = 0;
-      let erros = 0;
-      const novasFechadas = new Set(competenciasFechadas);
-
-      for (const comp of targets) {
-        const resultadosComp = results.filter((r) => getMonthKey(r.data) === comp);
-        const resumoComp: ConfrontoSummary = {
-          totalPlanilha: resultadosComp.filter((r) => r.valorPlanilha !== null).length,
-          totalXmls: resultadosComp.filter((r) => r.valorXml !== null).length,
-          ok: resultadosComp.filter((r) => r.status === 'ok').length,
-          divergentes: resultadosComp.filter((r) => r.status === 'divergente').length,
-          ausentes: resultadosComp.filter((r) => r.status === 'ausente_xml').length,
-          naoEscriturados: resultadosComp.filter((r) => r.status === 'nao_escriturado').length,
-          canceladas: resultadosComp.filter((r) => r.status === 'cancelada').length,
-        };
-        const res = await fecharMes({
-          empresaId,
-          competencia: comp,
-          fechadoPor: user.id,
-          resumo: resumoComp,
-          resultados: resultadosComp,
-        });
-        if (res.ok) {
-          salvas += 1;
-          novasFechadas.add(comp);
-        } else if (res.error?.includes('já foi fechada')) {
-          jaFechadas += 1;
-          novasFechadas.add(comp);
-        } else {
-          erros += 1;
-        }
-      }
-
-      setCompetenciasFechadas(novasFechadas);
-
-      if (salvas > 0) {
-        const partes: string[] = [];
-        partes.push(`${salvas} análise${salvas === 1 ? '' : 's'} salva${salvas === 1 ? '' : 's'}`);
-        if (jaFechadas > 0) partes.push(`${jaFechadas} já fechada${jaFechadas === 1 ? '' : 's'}`);
-        if (erros > 0) partes.push(`${erros} com erro`);
-        toast.success(partes.join(' · '));
-        // Exporta Excel apenas quando uma única competência foi salva
-        if (targets.length === 1) {
-          const comp = targets[0];
-          exportResults(results.filter((r) => getMonthKey(r.data) === comp));
-        }
-        setConfirmCloseOpen(false);
+      const res = await fecharMes({
+        empresaId,
+        competencia: saveCompetencia,
+        titulo,
+        fechadoPor: user.id,
+        resumo,
+        resultados: results,
+      });
+      if (res.ok) {
+        toast.success('Análise salva em Fechamentos');
+        exportResults(results);
+        setSaveDialogOpen(false);
         navigate({ to: '/fechamentos' });
-      } else if (erros > 0) {
-        toast.error('Erro ao salvar análise');
       } else {
-        toast.info('Nenhuma competência nova para salvar');
-        setConfirmCloseOpen(false);
+        toast.error(res.error || 'Erro ao salvar análise');
       }
     } finally {
       setIsClosing(false);
