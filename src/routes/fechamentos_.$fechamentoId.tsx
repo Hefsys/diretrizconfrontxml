@@ -147,6 +147,23 @@ function FechamentoDetailPage() {
           readOnly
           resetLabel="Voltar"
           onReset={() => navigate({ to: '/fechamentos' })}
+          onUpdate={
+            user.id === fechamento.fechado_por
+              ? async (newResults: ConfrontoResult[], newSummary: ConfrontoSummary) => {
+                  const res = await atualizarFechamento({
+                    id: fechamento.id,
+                    resumo: newSummary,
+                    resultados: newResults,
+                  });
+                  if (!res.ok) {
+                    toast.error('Falha ao atualizar análise', { description: res.error });
+                    return;
+                  }
+                  setFechamento({ ...fechamento, resultados: newResults, resumo: newSummary });
+                  toast.success('Análise atualizada');
+                }
+              : undefined
+          }
         />
       </main>
     </div>
