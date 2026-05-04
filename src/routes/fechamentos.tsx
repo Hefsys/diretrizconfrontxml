@@ -215,17 +215,15 @@ function FechamentosPage() {
                         >
                           <Download className="h-4 w-4" />
                         </Button>
-                        {f.fechado_por === user.id && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeleteTarget(f)}
-                            title="Excluir análise"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeleteTarget(f)}
+                          title="Excluir análise"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
