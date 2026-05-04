@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { listarFechamentos } from '@/lib/fechamentos';
+import { listarFechamentos, excluirFechamento } from '@/lib/fechamentos';
 import { exportResults } from '@/lib/export-excel';
 import type { FechamentoMensal } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,11 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Download, LogOut, Lock, Eye } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Download, LogOut, Lock, Eye, Trash2, Loader2 } from 'lucide-react';
 import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
 
 export const Route = createFileRoute('/fechamentos')({
