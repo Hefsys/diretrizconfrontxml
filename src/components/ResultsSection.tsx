@@ -36,6 +36,8 @@ interface ResultsSectionProps {
   empresaId?: string;
   readOnly?: boolean;
   resetLabel?: string;
+  /** Quando fornecido em readOnly, permite adicionar XMLs e persiste a análise atualizada. */
+  onUpdate?: (results: ConfrontoResult[], summary: ConfrontoSummary) => Promise<void> | void;
 }
 
 const STATUS_CONFIG: Record<ConfrontoStatus, { label: string; color: string; emoji: string }> = {
@@ -77,7 +79,7 @@ function formatCnpj(v: string): string {
   return v;
 }
 
-export function ResultsSection({ results: initialResults, summary: initialSummary, onReset, empresaId, readOnly = false, resetLabel }: ResultsSectionProps) {
+export function ResultsSection({ results: initialResults, summary: initialSummary, onReset, empresaId, readOnly = false, resetLabel, onUpdate }: ResultsSectionProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [results, setResults] = useState<ConfrontoResult[]>(initialResults);
@@ -241,6 +243,14 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
       );
       setResults(newResults);
       setSummary(newSummary);
+      if (onUpdate) {
+        try {
+          await onUpdate(newResults, newSummary);
+        } catch (persistErr) {
+          console.error('Erro ao persistir análise atualizada:', persistErr);
+          toast.error('XMLs reconciliados, mas falha ao salvar atualização');
+        }
+      }
       const monthLabel = selectedMonth === 'todos' ? '' : `${formatMonthLabel(selectedMonth)}: `;
       const descParts: string[] = [];
       if (unmatched > 0) descParts.push(`${unmatched} XML(s) sem correspondência adicionado(s) como "Não escriturado"`);
@@ -289,7 +299,8 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     toast.success('Registro removido');
   };
 
-  const showDropzone = !readOnly && selectedMonth !== 'todos' && summaryForMonth.ausentes > 0;
+  const canEditXmls = !readOnly || !!onUpdate;
+  const showDropzone = canEditXmls && selectedMonth !== 'todos' && summaryForMonth.ausentes > 0;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -318,7 +329,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             className="hidden"
             onChange={handleXmlFiles}
           />
-          {!readOnly && summaryForMonth.ausentes > 0 && (
+          {canEditXmls && summaryForMonth.ausentes > 0 && (
             <Button variant="outline" onClick={handleAddXmlsClick} disabled={isAddingXmls}>
               {isAddingXmls ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Adicionar XMLs

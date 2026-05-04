@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { listarFechamentos } from '@/lib/fechamentos';
+import { listarFechamentos, excluirFechamento } from '@/lib/fechamentos';
 import { exportResults } from '@/lib/export-excel';
 import type { FechamentoMensal } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,11 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Download, LogOut, Lock, Eye } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Download, LogOut, Lock, Eye, Trash2, Loader2 } from 'lucide-react';
 import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
 
 export const Route = createFileRoute('/fechamentos')({
@@ -51,6 +56,22 @@ function FechamentosPage() {
   const [empresaId, setEmpresaId] = useState<string>('');
   const [fechamentos, setFechamentos] = useState<FechamentoMensal[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<FechamentoMensal | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const res = await excluirFechamento(deleteTarget.id);
+    setIsDeleting(false);
+    if (!res.ok) {
+      toast.error('Falha ao excluir', { description: res.error });
+      return;
+    }
+    setFechamentos((prev) => prev.filter((f) => f.id !== deleteTarget.id));
+    toast.success('Análise excluída');
+    setDeleteTarget(null);
+  };
 
   useEffect(() => {
     if (!authLoading && !user) navigate({ to: '/auth' });
@@ -194,6 +215,17 @@ function FechamentosPage() {
                         >
                           <Download className="h-4 w-4" />
                         </Button>
+                        {f.fechado_por === user.id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteTarget(f)}
+                            title="Excluir análise"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -203,6 +235,30 @@ function FechamentosPage() {
           )}
         </Card>
       </main>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !isDeleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir análise?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.titulo
+                ? <>Esta ação removerá permanentemente a análise <strong>"{deleteTarget.titulo}"</strong>. Isso não pode ser desfeito.</>
+                : 'Esta ação removerá permanentemente a análise. Isso não pode ser desfeito.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleConfirmDelete(); }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

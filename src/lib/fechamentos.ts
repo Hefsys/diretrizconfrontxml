@@ -36,3 +36,28 @@ export async function listarFechamentos(empresaId?: string): Promise<FechamentoM
   if (error || !data) return [];
   return data as unknown as FechamentoMensal[];
 }
+
+export async function atualizarFechamento(params: {
+  id: string;
+  resumo: ConfrontoSummary;
+  resultados: ConfrontoResult[];
+}): Promise<{ ok: boolean; error?: string }> {
+  const { id, resumo, resultados } = params;
+  const { error } = await supabase
+    .from('fechamentos_mensais')
+    .update({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      resumo: resumo as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      resultados: resultados as any,
+    })
+    .eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function excluirFechamento(id: string): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await supabase.from('fechamentos_mensais').delete().eq('id', id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
