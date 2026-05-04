@@ -243,6 +243,14 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
       );
       setResults(newResults);
       setSummary(newSummary);
+      if (onUpdate) {
+        try {
+          await onUpdate(newResults, newSummary);
+        } catch (persistErr) {
+          console.error('Erro ao persistir análise atualizada:', persistErr);
+          toast.error('XMLs reconciliados, mas falha ao salvar atualização');
+        }
+      }
       const monthLabel = selectedMonth === 'todos' ? '' : `${formatMonthLabel(selectedMonth)}: `;
       const descParts: string[] = [];
       if (unmatched > 0) descParts.push(`${unmatched} XML(s) sem correspondência adicionado(s) como "Não escriturado"`);
