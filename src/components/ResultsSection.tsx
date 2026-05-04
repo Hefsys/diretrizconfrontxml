@@ -136,29 +136,88 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
   }, [resultsForMonth, filter, searchNf]);
 
   const isMonthClosed = selectedMonth !== 'todos' && competenciasFechadas.has(selectedMonth);
-  const canCloseMonth = !!empresaId && !!user && selectedMonth !== 'todos' && !isMonthClosed;
+
+  // Competências disponíveis nos resultados que ainda não foram fechadas (exclui "sem-data")
+  const competenciasSalvaveis = useMemo(
+    () =>
+      monthsAvailable
+        .map((m) => m.key)
+        .filter((k) => k !== 'sem-data' && !competenciasFechadas.has(k)),
+    [monthsAvailable, competenciasFechadas]
+  );
+
+  const canSave = !!empresaId && !!user && !readOnly && (
+    selectedMonth === 'todos'
+      ? competenciasSalvaveis.length > 0
+      : !isMonthClosed && selectedMonth !== 'sem-data'
+  );
 
   const handleCloseMonth = async () => {
-    if (!empresaId || !user || selectedMonth === 'todos') return;
+    if (!empresaId || !user) return;
     setIsClosing(true);
     try {
-      const res = await fecharMes({
-        empresaId,
-        competencia: selectedMonth,
-        fechadoPor: user.id,
-        resumo: summaryForMonth,
-        resultados: resultsForMonth,
-      });
-      if (!res.ok) {
-        toast.error(res.error ?? 'Erro ao fechar mês');
-        return;
+      // Determina quais competências salvar
+      const targets: string[] = selectedMonth === 'todos'
+        ? competenciasSalvaveis
+        : [selectedMonth];
+
+      let salvas = 0;
+      let jaFechadas = 0;
+      let erros = 0;
+      const novasFechadas = new Set(competenciasFechadas);
+
+      for (const comp of targets) {
+        const resultadosComp = results.filter((r) => getMonthKey(r.data) === comp);
+        const resumoComp: ConfrontoSummary = {
+          totalPlanilha: resultadosComp.filter((r) => r.valorPlanilha !== null).length,
+          totalXmls: resultadosComp.filter((r) => r.valorXml !== null).length,
+          ok: resultadosComp.filter((r) => r.status === 'ok').length,
+          divergentes: resultadosComp.filter((r) => r.status === 'divergente').length,
+          ausentes: resultadosComp.filter((r) => r.status === 'ausente_xml').length,
+          naoEscriturados: resultadosComp.filter((r) => r.status === 'nao_escriturado').length,
+          canceladas: resultadosComp.filter((r) => r.status === 'cancelada').length,
+        };
+        const res = await fecharMes({
+          empresaId,
+          competencia: comp,
+          fechadoPor: user.id,
+          resumo: resumoComp,
+          resultados: resultadosComp,
+        });
+        if (res.ok) {
+          salvas += 1;
+          novasFechadas.add(comp);
+        } else if (res.error?.includes('já foi fechada')) {
+          jaFechadas += 1;
+          novasFechadas.add(comp);
+        } else {
+          erros += 1;
+        }
       }
-      setCompetenciasFechadas((prev) => new Set(prev).add(selectedMonth));
-      exportResults(resultsForMonth);
-      toast.success(`Competência ${formatMonthLabel(selectedMonth)} fechada e Excel gerado.`);
+
+      setCompetenciasFechadas(novasFechadas);
+
+      if (salvas > 0) {
+        const partes: string[] = [];
+        partes.push(`${salvas} análise${salvas === 1 ? '' : 's'} salva${salvas === 1 ? '' : 's'}`);
+        if (jaFechadas > 0) partes.push(`${jaFechadas} já fechada${jaFechadas === 1 ? '' : 's'}`);
+        if (erros > 0) partes.push(`${erros} com erro`);
+        toast.success(partes.join(' · '));
+        // Exporta Excel apenas quando uma única competência foi salva
+        if (targets.length === 1) {
+          const comp = targets[0];
+          exportResults(results.filter((r) => getMonthKey(r.data) === comp));
+        }
+        setConfirmCloseOpen(false);
+        navigate({ to: '/fechamentos' });
+      } else if (erros > 0) {
+        toast.error('Erro ao salvar análise');
+      } else {
+        toast.info('Nenhuma competência nova para salvar');
+        setConfirmCloseOpen(false);
+      }
     } finally {
       setIsClosing(false);
-      setConfirmCloseOpen(false);
     }
   };
 
