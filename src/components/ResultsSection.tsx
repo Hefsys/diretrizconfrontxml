@@ -79,7 +79,7 @@ function formatCnpj(v: string): string {
   return v;
 }
 
-export function ResultsSection({ results: initialResults, summary: initialSummary, onReset, empresaId, readOnly = false, resetLabel }: ResultsSectionProps) {
+export function ResultsSection({ results: initialResults, summary: initialSummary, onReset, empresaId, readOnly = false, resetLabel, onUpdate }: ResultsSectionProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [results, setResults] = useState<ConfrontoResult[]>(initialResults);
