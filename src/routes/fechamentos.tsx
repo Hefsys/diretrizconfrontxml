@@ -56,6 +56,22 @@ function FechamentosPage() {
   const [empresaId, setEmpresaId] = useState<string>('');
   const [fechamentos, setFechamentos] = useState<FechamentoMensal[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<FechamentoMensal | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const res = await excluirFechamento(deleteTarget.id);
+    setIsDeleting(false);
+    if (!res.ok) {
+      toast.error('Falha ao excluir', { description: res.error });
+      return;
+    }
+    setFechamentos((prev) => prev.filter((f) => f.id !== deleteTarget.id));
+    toast.success('Análise excluída');
+    setDeleteTarget(null);
+  };
 
   useEffect(() => {
     if (!authLoading && !user) navigate({ to: '/auth' });
