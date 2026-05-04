@@ -1,46 +1,31 @@
 ## Objetivo
 
-Permitir abrir um fechamento salvo dentro da página **Fechamentos** e ver a mesma análise detalhada da tela de **Confronto** — em modo **somente leitura**, sem precisar reimportar planilha ou XMLs.
+Adicionar um botão **"Salvar análise"** na tela de resultado do Confronto que persiste o fechamento e leva o usuário direto para a página de Fechamentos.
 
-## O que muda
+Hoje já existe o botão **"Fechar mês"**, mas ele:
+- Só aparece quando uma competência específica está selecionada (não funciona com "Todos")
+- O nome "Fechar mês" não comunica claramente que é a ação de salvar
+- Não navega para `/fechamentos` depois de salvar — fica na mesma tela
 
-### 1. Tornar o `ResultsSection` reutilizável em modo "somente leitura"
+## Mudanças
 
-`src/components/ResultsSection.tsx` hoje é usado só após uma análise nova. Vou adicionar uma prop opcional `readOnly?: boolean` (default `false`). Quando `true`:
+### 1. `src/components/ResultsSection.tsx`
+- Renomear o botão "Fechar mês" para **"Salvar análise"** (mantém o ícone de cadeado discreto + Save).
+- Quando o usuário estiver em **"Todos"** e houver mais de uma competência nos resultados, abrir um pequeno seletor (dialog) pedindo qual competência salvar — ou salvar todas em lote, uma por uma.
+- Quando há apenas uma competência detectada nos dados (mesmo com "Todos" selecionado), salvar direto essa competência sem perguntar.
+- Após salvar com sucesso:
+  - Toast de sucesso (mantém)
+  - Navegar para `/fechamentos` usando `useNavigate` do `@tanstack/react-router`
+- Manter o comportamento de gerar o Excel ao salvar (já existe).
+- Manter o `AlertDialog` de confirmação antes de salvar.
 
-- **Esconder** os botões/ações de mutação:
-  - "Adicionar XMLs" + dropzone de arrastar XMLs
-  - "Fechar mês"
-  - "Nova Análise"
-  - Botão de excluir (lixeira) em cada linha
-- **Manter** tudo o que é leitura: filtros por status, chips de competência, busca por nº NF, cards de resumo, tabela completa, e botão "Exportar Excel".
-- Em vez de "Nova Análise", mostrar um botão "Voltar" que chama `onReset`.
-- Mostrar um badge fixo "Mês fechado" ao lado do título.
+### 2. Texto/UX
+- Botão principal de salvar fica na cor da marca (`bg-diretriz-red`) para ganhar destaque, e o "Nova Análise" vira `outline` para não competir.
+- Tooltip explicando: "Salva esta análise em Fechamentos e gera o Excel".
 
-Nenhuma lógica de cálculo muda — apenas oculta controles.
+## Detalhes técnicos
 
-### 2. Nova rota de detalhe: `/fechamentos/$fechamentoId`
-
-Arquivo novo: `src/routes/fechamentos.$fechamentoId.tsx`
-
-- Carrega o fechamento via `supabase.from('fechamentos_mensais').select('*').eq('id', ...).single()`.
-- Carrega o nome da empresa para o cabeçalho.
-- Renderiza o mesmo header da página atual de Fechamentos (logo + nav + sair).
-- Renderiza `<ResultsSection results={f.resultados} summary={f.resumo} readOnly empresaId={f.empresa_id} onReset={() => navigate({ to: '/fechamentos' })} />`.
-- Trata `errorComponent` e `notFoundComponent`.
-
-### 3. Lista de Fechamentos vira clicável
-
-Em `src/routes/fechamentos.tsx`, cada linha da tabela passa a ter um botão "Abrir" (ícone de olho/abrir) ao lado do botão de download, navegando para `/fechamentos/$fechamentoId`. A linha inteira também recebe `cursor-pointer` + onClick para abrir o detalhe (o clique no botão de download faz `stopPropagation` para não abrir o detalhe).
-
-## Observações
-
-- Os dados do fechamento já são salvos por completo no `fechamentos_mensais.resultados` (jsonb), então não precisa reler XMLs nem planilha — basta hidratar a tela com esse jsonb. O snapshot reflete exatamente o estado no momento em que o mês foi fechado.
-- Como é só leitura, mesmo se XMLs forem adicionados/removidos depois na base, o fechamento mostra o que foi congelado — comportamento desejado para auditoria.
-- Nenhuma alteração em banco / RLS / engine / parsers.
-
-## Arquivos editados/criados
-
-- `src/components/ResultsSection.tsx` — adicionar prop `readOnly` e ocultar controles de mutação quando ativa.
-- `src/routes/fechamentos.tsx` — tornar linhas clicáveis e adicionar botão "Abrir".
-- `src/routes/fechamentos.$fechamentoId.tsx` — **novo** arquivo, página de detalhe.
+- Arquivo único alterado: `src/components/ResultsSection.tsx`.
+- Usar `useNavigate()` de `@tanstack/react-router` para redirecionar após `fecharMes` retornar `ok: true`.
+- Para o caso "Todos" com múltiplas competências: iterar `monthsAvailable`, chamar `fecharMes` para cada uma (ignorando as já fechadas), agregar resultado e mostrar toast com resumo (ex: "3 competências salvas, 1 já estava fechada").
+- Nenhuma mudança de schema, nenhuma migration.
