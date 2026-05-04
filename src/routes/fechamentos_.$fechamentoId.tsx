@@ -72,13 +72,7 @@ function FechamentoDetailPage() {
         }
         const f = data as unknown as FechamentoMensal;
         setFechamento(f);
-        const isAuthor = user.id === f.fechado_por;
-        if (isAuthor) {
-          setCanUpdateFechamento(true);
-        } else {
-          const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' });
-          if (!cancelled) setCanUpdateFechamento(!!isAdmin);
-        }
+        setCanUpdateFechamento(true);
         const { data: emp } = await supabase
           .from('empresas')
           .select('razao_social')
