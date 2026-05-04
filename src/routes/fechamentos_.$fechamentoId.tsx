@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate, Link, ErrorComponent } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { ResultsSection } from '@/components/ResultsSection';
-import type { FechamentoMensal } from '@/lib/types';
+import { atualizarFechamento } from '@/lib/fechamentos';
+import type { ConfrontoResult, ConfrontoSummary, FechamentoMensal } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { LogOut, ArrowLeft } from 'lucide-react';
 import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
