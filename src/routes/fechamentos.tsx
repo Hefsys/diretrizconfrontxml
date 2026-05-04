@@ -235,6 +235,30 @@ function FechamentosPage() {
           )}
         </Card>
       </main>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && !isDeleting && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir análise?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget?.titulo
+                ? <>Esta ação removerá permanentemente a análise <strong>"{deleteTarget.titulo}"</strong>. Isso não pode ser desfeito.</>
+                : 'Esta ação removerá permanentemente a análise. Isso não pode ser desfeito.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleConfirmDelete(); }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
