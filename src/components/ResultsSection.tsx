@@ -570,28 +570,57 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {selectedMonth === 'todos'
-                ? `Salvar ${competenciasSalvaveis.length} competência${competenciasSalvaveis.length === 1 ? '' : 's'}?`
-                : `Salvar análise de ${formatMonthLabel(selectedMonth)}?`}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {selectedMonth === 'todos'
-                ? `As competências serão salvas em Fechamentos: ${competenciasSalvaveis.map(formatMonthLabel).join(', ')}. Cada competência fica congelada e não pode ser reaberta.`
-                : `Esta análise será salva em Fechamentos e o Excel será gerado. A competência fica congelada e não pode ser reaberta.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isClosing}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCloseMonth} disabled={isClosing} className="bg-diretriz-red text-white hover:bg-diretriz-red/90">
-              {isClosing ? 'Salvando…' : 'Salvar análise'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Dialog open={saveDialogOpen} onOpenChange={(o) => !isClosing && setSaveDialogOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Salvar análise em Fechamentos</DialogTitle>
+            <DialogDescription>
+              Defina um título para identificar esta análise e a competência (mês de referência) à qual ela pertence.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="save-titulo">Título da análise</Label>
+              <Input
+                id="save-titulo"
+                value={saveTitulo}
+                onChange={(e) => setSaveTitulo(e.target.value)}
+                placeholder="Ex.: Fechamento oficial Mar/26"
+                disabled={isClosing}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="save-competencia">Competência</Label>
+              <Select value={saveCompetencia} onValueChange={setSaveCompetencia} disabled={isClosing}>
+                <SelectTrigger id="save-competencia">
+                  <SelectValue placeholder="Selecione a competência" />
+                </SelectTrigger>
+                <SelectContent>
+                  {competenciasOpcoes.map((c) => (
+                    <SelectItem key={c} value={c}>{formatMonthLabel(c)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {results.length} registro{results.length === 1 ? '' : 's'} serão salvos nesta análise.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveDialogOpen(false)} disabled={isClosing}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveAnalise}
+              disabled={isClosing || !saveTitulo.trim() || !saveCompetencia}
+              className="bg-diretriz-red text-white hover:bg-diretriz-red/90"
+            >
+              {isClosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar análise
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
