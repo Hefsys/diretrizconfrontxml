@@ -1,54 +1,66 @@
-## Problema confirmado
 
-Olhando as três imagens lado a lado, a NF 479664 (Volkswagen) prova que a lógica de "somar IPI" está errada na raiz — não é só o gatilho que está errado, é a soma em si:
+## Problema
 
-- **Valor Total da NF no Dealernet**: R$ 1.256,61
-- **vNF do XML**: R$ 1.256,61
-- **Coluna AA da planilha RFS008**: R$ 1.256,61 ← já é o Valor Total da NF
-- **Confronto retorna**: Valor Planilha R$ 2.772,28 (errado, inflado em R$ 1.515,67)
+Ao usar **"Adicionar XMLs"** (ou arrastar XMLs no dropzone do mês) na tela de resultados, as notas marcadas como **"Ausente no XML"** muitas vezes continuam ausentes mesmo quando o XML correspondente foi enviado. Investigação do código revelou três causas:
 
-A diferença R$ 1.515,67 é exatamente `259,06 + ... + 31,41` (valores das colunas AO/AR que o parser lê como "IPI").
+### Causa 1 — Critério de match restritivo (principal)
+Em `src/lib/confronto-engine.ts`, `reconcileMissing` só consegue casar XML ↔ linha ausente em dois cenários:
+- `chNFe` da linha tem exatamente 44 dígitos **e** bate com a do XML, **ou**
+- `nNF` **E** `cnpjEmitente` da linha existem **e** batem com o XML.
 
-### Causa raiz
+Na planilha **RFS008 do Dealernet** isso falha com frequência:
+- a coluna "Chave NF-e" muitas vezes vem em branco ou truncada;
+- quando a coluna CNPJ não foi corretamente identificada pelo parser, `row.cnpjEmitente` fica vazio → **o fallback nNF+CNPJ nunca dispara** e a nota permanece "ausente".
 
-A coluna **AA do RFS008 é o próprio Valor Total da NF**, com IPI já embutido. As colunas AO ("ICMS ST RET ENTRADA") e AR ("VALOR IPI") são **detalhamento informativo**, distribuídas em duas linhas por NF, e **nunca devem ser somadas** ao valor contábil.
+### Causa 2 — XMLs adicionados não são persistidos
+`processXmlFiles` em `ResultsSection.tsx` chama `parseXmlFiles` + `reconcileMissing`, mas **não chama `salvarXmls`**. Os XMLs reconciliados ficam só em memória — refazer a análise no dia seguinte volta a mostrar tudo como ausente.
 
-Ou seja, todo o ramo "se o XML tem IPI, somar AA + AR à planilha" está incorreto. A planilha RFS008 já entrega o valor final.
+### Causa 3 — Filtro de mês descarta linhas com data inválida
+Quando a data da nota não foi parseada da planilha (cai em `'sem-data'`), o `monthFilter` exclui essa linha de qualquer competência selecionada → ela nunca é reconciliada via dropzone do mês.
 
-## Correção
+---
 
-### 1. `src/lib/confronto-engine.ts`
-- Em `runConfronto`: remover o cálculo `valorPlanilhaAjustado = somaIpi ? row.valorContabil + vIpiAA + vIpiAR : row.valorContabil`. Usar diretamente:
-  ```ts
-  const valorPlanilha = row.valorContabil;
-  const diff = Math.abs(valorPlanilha - matchedXml.vNF);
-  ```
-- Remover variável `somaIpi` e o uso de `vIpiAA`/`vIpiAR`.
-- Em `reconcileMissing`: remover também a referência a `xml.vIPI` e `somaIpi` (atualmente já compara direto, só limpar o código morto).
+## Solução
 
-### 2. `src/lib/excel-parser.ts`
-- Remover a leitura de `row[26]` (AA) como IPI e `row[43]` (AR) como IPI — esses campos são lixo informativo no contexto do confronto. Manter o tipo por compatibilidade ou removê-lo (ver passo 3).
+### 1. Tornar o match mais tolerante em `reconcileMissing`
+Em `src/lib/confronto-engine.ts`, ampliar a lógica de busca por XML correspondente, na seguinte ordem de prioridade:
 
-### 3. `src/lib/types.ts`
-- Remover `vIpiAA` e `vIpiAR` de `ExcelNfeData` (não são mais usados em lugar nenhum).
+1. `chNFe` (44 dígitos) — exato.
+2. `nNF` + `cnpjEmitente` limpos — exato.
+3. **Novo**: `nNF` apenas, restrito ao escopo já filtrado (mesma competência via `monthFilter`, ou todo o conjunto se não houver filtro). Quando há ambiguidade (mais de um XML com o mesmo `nNF` no escopo), pular para evitar match errado.
+4. **Novo**: se a linha tem `cnpjEmitente` mas `nNF` vazio/zero, tentar match por CNPJ + `vNF` aproximado (≤ 0,01) dentro do escopo.
 
-### 4. `src/routes/empresas.tsx` e `src/routes/index.tsx`
-- Remover o aviso "IPI somado automaticamente quando o XML tem IPI" (não é mais verdade — a comparação é sempre direta).
-- Garantir que não sobrou nada referenciando `soma_ipi_dealernet` ou `vIpi*` no UI.
+Isso resolve os casos do RFS008 onde a chave/CNPJ não vem na planilha.
 
-### 5. Banco de dados (`empresas.soma_ipi_dealernet`)
-- A coluna pode ficar no banco por enquanto (não atrapalha). Drop opcional em limpeza futura.
+### 2. Persistir XMLs adicionados na base da empresa
+Em `src/components/ResultsSection.tsx`, função `processXmlFiles`:
+- Importar `salvarXmls` de `@/lib/xml-storage`.
+- Após o parse e antes de `reconcileMissing`, chamar `salvarXmls(empresaId, user.id, xmlData)`.
+- Incluir a contagem de salvos no toast: `"X reconciliada(s) · Y XML(s) salvo(s) na base"`.
+- Requer que `ResultsSection` receba (já recebe) `empresaId` e tenha acesso ao `user` (já tem via `useAuth`). Se `empresaId` não estiver presente, pular a persistência com aviso suave.
 
-## Comportamento esperado depois
+### 3. Não excluir notas "sem-data" do dropzone do mês
+Em `processXmlFiles` (ResultsSection.tsx), ajustar `monthFilter`:
+- Quando `selectedMonth !== 'todos'`, aceitar tanto linhas do mês selecionado **quanto** linhas com `getMonthKey(row.data) === 'sem-data'`. Assim, notas sem data parseável também participam da reconciliação manual quando o usuário está focado em um mês específico.
 
-Para a NF 479664:
-- valorPlanilha = 1.256,61 (AA da planilha)
-- valorXml = 1.256,61 (vNF do XML)
-- diff = 0 → status **OK** ✅
+### 4. Pequeno ajuste de UX
+- Manter o botão "Adicionar XMLs" no header também quando `selectedMonth !== 'todos'` e houver ausentes naquele mês (hoje só aparece em "todos"), além do dropzone — assim o usuário tem ambos os caminhos visíveis.
 
-Esse mesmo princípio vale para **toda** NF: o RFS008 já traz o valor final correto na coluna Valor Contábil.
+---
 
-## Fora de escopo
+## Arquivos afetados
 
-- Drop da coluna `soma_ipi_dealernet` no banco.
-- Implementação dos status detalhados da especificação (OK NF 02, OK NF 06, etc.) — segue como evolução futura.
+- `src/lib/confronto-engine.ts` — ampliar fallbacks de match em `reconcileMissing` (itens 3 e 4 da lógica).
+- `src/components/ResultsSection.tsx` — chamar `salvarXmls` em `processXmlFiles`, ajustar `monthFilter` para incluir `sem-data`, exibir botão também em mês específico.
+
+Sem mudanças de schema no banco. Sem novas dependências.
+
+---
+
+## Como validar depois
+
+1. Selecionar empresa, processar planilha RFS008 com algumas chaves vazias.
+2. Confirmar notas em "Ausente no XML".
+3. Clicar em uma competência específica → arrastar XMLs daquelas notas no dropzone.
+4. Esperado: notas viram "OK"/"Divergente" e o toast mostra também "X salvo(s) na base".
+5. Clicar em "Nova Análise", reenviar a mesma planilha sem reenviar XMLs → as mesmas notas devem aparecer já reconciliadas (vindas da base histórica).
