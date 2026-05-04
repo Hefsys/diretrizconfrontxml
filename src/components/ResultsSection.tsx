@@ -185,7 +185,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
         competencia: saveCompetencia,
         titulo,
         fechadoPor: user.id,
-        resumo,
+        resumo: summary,
         resultados: results,
       });
       if (res.ok) {
