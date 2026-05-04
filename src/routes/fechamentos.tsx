@@ -14,7 +14,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Download, LogOut, Lock } from 'lucide-react';
+import { Download, LogOut, Lock, Eye } from 'lucide-react';
 import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
 
 export const Route = createFileRoute('/fechamentos')({
@@ -155,7 +155,11 @@ function FechamentosPage() {
               </TableHeader>
               <TableBody>
                 {fechamentos.map((f) => (
-                  <TableRow key={f.id}>
+                  <TableRow
+                    key={f.id}
+                    className="cursor-pointer hover:bg-muted/40"
+                    onClick={() => navigate({ to: '/fechamentos/$fechamentoId', params: { fechamentoId: f.id } })}
+                  >
                     <TableCell>
                       <Badge variant="outline" className="font-mono">{formatMonthLabel(f.competencia)}</Badge>
                     </TableCell>
@@ -169,14 +173,24 @@ function FechamentosPage() {
                     <TableCell className="text-right font-mono text-blue-600">{f.resumo.naoEscriturados}</TableCell>
                     <TableCell className="text-right font-mono text-zinc-600">{f.resumo.canceladas}</TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => exportResults(f.resultados)}
-                        title="Baixar Excel"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
+                      <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate({ to: '/fechamentos/$fechamentoId', params: { fechamentoId: f.id } })}
+                          title="Abrir detalhe"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => exportResults(f.resultados)}
+                          title="Baixar Excel"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
