@@ -13,13 +13,20 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import type { ConfrontoResult, ConfrontoSummary, ConfrontoStatus } from '@/lib/types';
 import { exportResults } from '@/lib/export-excel';
 import { getMonthKey } from '@/lib/confronto-engine';
-import { fecharMes, listarCompetenciasFechadas } from '@/lib/fechamentos';
+import { fecharMes } from '@/lib/fechamentos';
 import { useAuth } from '@/hooks/useAuth';
 
 interface ResultsSectionProps {
