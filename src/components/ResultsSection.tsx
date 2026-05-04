@@ -324,9 +324,9 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
               Adicionar XMLs
             </Button>
           )}
-          {(readOnly || isMonthClosed) && (
+          {readOnly && (
             <Badge variant="outline" className="border-diretriz-red/40 text-diretriz-red flex items-center gap-1 px-3">
-              <Lock className="h-3 w-3" /> Mês fechado
+              <Lock className="h-3 w-3" /> Análise salva
             </Badge>
           )}
           <Button variant="outline" onClick={() => exportResults(resultsForMonth)}>
@@ -339,7 +339,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
           )}
           {canSave && (
             <Button
-              onClick={() => setConfirmCloseOpen(true)}
+              onClick={openSaveDialog}
               disabled={isClosing}
               className="bg-diretriz-red text-white hover:bg-diretriz-red/90"
               title="Salva esta análise em Fechamentos"
