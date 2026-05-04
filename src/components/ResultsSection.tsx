@@ -593,17 +593,21 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
       <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Fechar competência {selectedMonth !== 'todos' && formatMonthLabel(selectedMonth)}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {selectedMonth === 'todos'
+                ? `Salvar ${competenciasSalvaveis.length} competência${competenciasSalvaveis.length === 1 ? '' : 's'}?`
+                : `Salvar análise de ${formatMonthLabel(selectedMonth)}?`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação congela o resultado da competência para esta empresa e gera o Excel de fechamento.
-              O mês não poderá mais ser reaberto, e tentativas futuras de fechar a mesma competência serão bloqueadas.
-              Todas as {resultsForMonth.length} linhas (OK, divergentes, ausentes, não escriturados e canceladas) serão salvas.
+              {selectedMonth === 'todos'
+                ? `As competências serão salvas em Fechamentos: ${competenciasSalvaveis.map(formatMonthLabel).join(', ')}. Cada competência fica congelada e não pode ser reaberta.`
+                : `Esta análise será salva em Fechamentos e o Excel será gerado. A competência fica congelada e não pode ser reaberta.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isClosing}>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleCloseMonth} disabled={isClosing} className="bg-diretriz-red text-white hover:bg-diretriz-red/90">
-              {isClosing ? 'Fechando…' : 'Fechar e gerar Excel'}
+              {isClosing ? 'Salvando…' : 'Salvar análise'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
