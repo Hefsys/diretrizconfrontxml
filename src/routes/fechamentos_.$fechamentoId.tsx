@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { LogOut, ArrowLeft } from 'lucide-react';
 import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
 
-export const Route = createFileRoute('/fechamentos/$fechamentoId')({
+export const Route = createFileRoute('/fechamentos_/$fechamentoId')({
   head: () => ({
     meta: [
       { title: 'Detalhe do Fechamento — Diretriz Contabilidade' },
