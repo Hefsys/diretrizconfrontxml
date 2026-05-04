@@ -175,10 +175,22 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     try {
       const { parseXmlFiles } = await import('@/lib/xml-parser');
       const { reconcileMissing } = await import('@/lib/confronto-engine');
+      const { salvarXmls } = await import('@/lib/xml-storage');
       const xmlData = await parseXmlFiles(files);
+
+      // Persistir os XMLs na base da empresa para reaproveitamento futuro
+      let salvos = 0;
+      if (empresaId && user && xmlData.length > 0) {
+        salvos = await salvarXmls(empresaId, user.id, xmlData);
+      }
+
+      // Filtro de mês: aceita também notas com data não parseada ('sem-data')
       const monthFilter = selectedMonth === 'todos'
         ? undefined
-        : (row: ConfrontoResult) => getMonthKey(row.data) === selectedMonth;
+        : (row: ConfrontoResult) => {
+            const k = getMonthKey(row.data);
+            return k === selectedMonth || k === 'sem-data';
+          };
       const { results: newResults, summary: newSummary, matched, unmatched } = reconcileMissing(
         results,
         xmlData,
@@ -187,8 +199,11 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
       setResults(newResults);
       setSummary(newSummary);
       const monthLabel = selectedMonth === 'todos' ? '' : `${formatMonthLabel(selectedMonth)}: `;
+      const descParts: string[] = [];
+      if (unmatched > 0) descParts.push(`${unmatched} XML(s) sem correspondência adicionado(s) como "Não escriturado"`);
+      if (salvos > 0) descParts.push(`${salvos} XML(s) salvo(s) na base da empresa`);
       toast.success(`${monthLabel}${matched} nota(s) reconciliada(s)`, {
-        description: unmatched > 0 ? `${unmatched} XML(s) sem correspondência adicionado(s) como "Não escriturado"` : undefined,
+        description: descParts.length > 0 ? descParts.join(' · ') : undefined,
       });
     } catch (err) {
       console.error('Erro ao adicionar XMLs:', err);
@@ -260,7 +275,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             className="hidden"
             onChange={handleXmlFiles}
           />
-          {selectedMonth === 'todos' && summary.ausentes > 0 && (
+          {summaryForMonth.ausentes > 0 && (
             <Button variant="outline" onClick={handleAddXmlsClick} disabled={isAddingXmls}>
               {isAddingXmls ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Adicionar XMLs

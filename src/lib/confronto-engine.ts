@@ -42,18 +42,56 @@ export function reconcileMissing(
   let matched = 0;
   const usedXmlIdx = new Set<number>();
 
+  // Pre-conta nNF dentro do conjunto novo para detectar ambiguidade no fallback por nNF apenas
+  const nnfCounts = new Map<string, number>();
+  for (const xml of newXmlData) {
+    if (!xml.nNF) continue;
+    nnfCounts.set(xml.nNF, (nnfCounts.get(xml.nNF) ?? 0) + 1);
+  }
+
   for (let i = 0; i < results.length; i++) {
     const row = results[i];
     if (row.status !== 'ausente_xml') continue;
     if (monthFilter && !monthFilter(row)) continue;
 
-    const xmlIdx = newXmlData.findIndex((xml, idx) => {
-      if (usedXmlIdx.has(idx)) return false;
-      if (row.chNFe && row.chNFe.length === 44 && xml.chNFe === row.chNFe) return true;
-      if (row.nNF && row.cnpjEmitente && xml.nNF === row.nNF
-        && cleanCnpj(xml.cnpjEmitente) === cleanCnpj(row.cnpjEmitente)) return true;
-      return false;
-    });
+    let xmlIdx = -1;
+
+    // 1) Match por chNFe (44 dígitos)
+    if (row.chNFe && row.chNFe.length === 44) {
+      xmlIdx = newXmlData.findIndex(
+        (xml, idx) => !usedXmlIdx.has(idx) && xml.chNFe === row.chNFe
+      );
+    }
+
+    // 2) Match por nNF + CNPJ
+    if (xmlIdx === -1 && row.nNF && row.cnpjEmitente) {
+      const cnpjRow = cleanCnpj(row.cnpjEmitente);
+      xmlIdx = newXmlData.findIndex(
+        (xml, idx) =>
+          !usedXmlIdx.has(idx) &&
+          xml.nNF === row.nNF &&
+          cleanCnpj(xml.cnpjEmitente) === cnpjRow
+      );
+    }
+
+    // 3) Fallback: nNF apenas (somente se único no conjunto novo)
+    if (xmlIdx === -1 && row.nNF && (nnfCounts.get(row.nNF) ?? 0) === 1) {
+      xmlIdx = newXmlData.findIndex(
+        (xml, idx) => !usedXmlIdx.has(idx) && xml.nNF === row.nNF
+      );
+    }
+
+    // 4) Fallback: CNPJ + valor aproximado (quando não há nNF na linha)
+    if (xmlIdx === -1 && (!row.nNF || row.nNF === '0') && row.cnpjEmitente && row.valorPlanilha != null) {
+      const cnpjRow = cleanCnpj(row.cnpjEmitente);
+      const planilhaVal = row.valorPlanilha;
+      xmlIdx = newXmlData.findIndex(
+        (xml, idx) =>
+          !usedXmlIdx.has(idx) &&
+          cleanCnpj(xml.cnpjEmitente) === cnpjRow &&
+          Math.abs(xml.vNF - planilhaVal) <= 0.01
+      );
+    }
 
     if (xmlIdx === -1) continue;
     usedXmlIdx.add(xmlIdx);
