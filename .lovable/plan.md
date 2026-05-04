@@ -1,66 +1,46 @@
+## Objetivo
 
-## Problema
+Permitir abrir um fechamento salvo dentro da página **Fechamentos** e ver a mesma análise detalhada da tela de **Confronto** — em modo **somente leitura**, sem precisar reimportar planilha ou XMLs.
 
-Ao usar **"Adicionar XMLs"** (ou arrastar XMLs no dropzone do mês) na tela de resultados, as notas marcadas como **"Ausente no XML"** muitas vezes continuam ausentes mesmo quando o XML correspondente foi enviado. Investigação do código revelou três causas:
+## O que muda
 
-### Causa 1 — Critério de match restritivo (principal)
-Em `src/lib/confronto-engine.ts`, `reconcileMissing` só consegue casar XML ↔ linha ausente em dois cenários:
-- `chNFe` da linha tem exatamente 44 dígitos **e** bate com a do XML, **ou**
-- `nNF` **E** `cnpjEmitente` da linha existem **e** batem com o XML.
+### 1. Tornar o `ResultsSection` reutilizável em modo "somente leitura"
 
-Na planilha **RFS008 do Dealernet** isso falha com frequência:
-- a coluna "Chave NF-e" muitas vezes vem em branco ou truncada;
-- quando a coluna CNPJ não foi corretamente identificada pelo parser, `row.cnpjEmitente` fica vazio → **o fallback nNF+CNPJ nunca dispara** e a nota permanece "ausente".
+`src/components/ResultsSection.tsx` hoje é usado só após uma análise nova. Vou adicionar uma prop opcional `readOnly?: boolean` (default `false`). Quando `true`:
 
-### Causa 2 — XMLs adicionados não são persistidos
-`processXmlFiles` em `ResultsSection.tsx` chama `parseXmlFiles` + `reconcileMissing`, mas **não chama `salvarXmls`**. Os XMLs reconciliados ficam só em memória — refazer a análise no dia seguinte volta a mostrar tudo como ausente.
+- **Esconder** os botões/ações de mutação:
+  - "Adicionar XMLs" + dropzone de arrastar XMLs
+  - "Fechar mês"
+  - "Nova Análise"
+  - Botão de excluir (lixeira) em cada linha
+- **Manter** tudo o que é leitura: filtros por status, chips de competência, busca por nº NF, cards de resumo, tabela completa, e botão "Exportar Excel".
+- Em vez de "Nova Análise", mostrar um botão "Voltar" que chama `onReset`.
+- Mostrar um badge fixo "Mês fechado" ao lado do título.
 
-### Causa 3 — Filtro de mês descarta linhas com data inválida
-Quando a data da nota não foi parseada da planilha (cai em `'sem-data'`), o `monthFilter` exclui essa linha de qualquer competência selecionada → ela nunca é reconciliada via dropzone do mês.
+Nenhuma lógica de cálculo muda — apenas oculta controles.
 
----
+### 2. Nova rota de detalhe: `/fechamentos/$fechamentoId`
 
-## Solução
+Arquivo novo: `src/routes/fechamentos.$fechamentoId.tsx`
 
-### 1. Tornar o match mais tolerante em `reconcileMissing`
-Em `src/lib/confronto-engine.ts`, ampliar a lógica de busca por XML correspondente, na seguinte ordem de prioridade:
+- Carrega o fechamento via `supabase.from('fechamentos_mensais').select('*').eq('id', ...).single()`.
+- Carrega o nome da empresa para o cabeçalho.
+- Renderiza o mesmo header da página atual de Fechamentos (logo + nav + sair).
+- Renderiza `<ResultsSection results={f.resultados} summary={f.resumo} readOnly empresaId={f.empresa_id} onReset={() => navigate({ to: '/fechamentos' })} />`.
+- Trata `errorComponent` e `notFoundComponent`.
 
-1. `chNFe` (44 dígitos) — exato.
-2. `nNF` + `cnpjEmitente` limpos — exato.
-3. **Novo**: `nNF` apenas, restrito ao escopo já filtrado (mesma competência via `monthFilter`, ou todo o conjunto se não houver filtro). Quando há ambiguidade (mais de um XML com o mesmo `nNF` no escopo), pular para evitar match errado.
-4. **Novo**: se a linha tem `cnpjEmitente` mas `nNF` vazio/zero, tentar match por CNPJ + `vNF` aproximado (≤ 0,01) dentro do escopo.
+### 3. Lista de Fechamentos vira clicável
 
-Isso resolve os casos do RFS008 onde a chave/CNPJ não vem na planilha.
+Em `src/routes/fechamentos.tsx`, cada linha da tabela passa a ter um botão "Abrir" (ícone de olho/abrir) ao lado do botão de download, navegando para `/fechamentos/$fechamentoId`. A linha inteira também recebe `cursor-pointer` + onClick para abrir o detalhe (o clique no botão de download faz `stopPropagation` para não abrir o detalhe).
 
-### 2. Persistir XMLs adicionados na base da empresa
-Em `src/components/ResultsSection.tsx`, função `processXmlFiles`:
-- Importar `salvarXmls` de `@/lib/xml-storage`.
-- Após o parse e antes de `reconcileMissing`, chamar `salvarXmls(empresaId, user.id, xmlData)`.
-- Incluir a contagem de salvos no toast: `"X reconciliada(s) · Y XML(s) salvo(s) na base"`.
-- Requer que `ResultsSection` receba (já recebe) `empresaId` e tenha acesso ao `user` (já tem via `useAuth`). Se `empresaId` não estiver presente, pular a persistência com aviso suave.
+## Observações
 
-### 3. Não excluir notas "sem-data" do dropzone do mês
-Em `processXmlFiles` (ResultsSection.tsx), ajustar `monthFilter`:
-- Quando `selectedMonth !== 'todos'`, aceitar tanto linhas do mês selecionado **quanto** linhas com `getMonthKey(row.data) === 'sem-data'`. Assim, notas sem data parseável também participam da reconciliação manual quando o usuário está focado em um mês específico.
+- Os dados do fechamento já são salvos por completo no `fechamentos_mensais.resultados` (jsonb), então não precisa reler XMLs nem planilha — basta hidratar a tela com esse jsonb. O snapshot reflete exatamente o estado no momento em que o mês foi fechado.
+- Como é só leitura, mesmo se XMLs forem adicionados/removidos depois na base, o fechamento mostra o que foi congelado — comportamento desejado para auditoria.
+- Nenhuma alteração em banco / RLS / engine / parsers.
 
-### 4. Pequeno ajuste de UX
-- Manter o botão "Adicionar XMLs" no header também quando `selectedMonth !== 'todos'` e houver ausentes naquele mês (hoje só aparece em "todos"), além do dropzone — assim o usuário tem ambos os caminhos visíveis.
+## Arquivos editados/criados
 
----
-
-## Arquivos afetados
-
-- `src/lib/confronto-engine.ts` — ampliar fallbacks de match em `reconcileMissing` (itens 3 e 4 da lógica).
-- `src/components/ResultsSection.tsx` — chamar `salvarXmls` em `processXmlFiles`, ajustar `monthFilter` para incluir `sem-data`, exibir botão também em mês específico.
-
-Sem mudanças de schema no banco. Sem novas dependências.
-
----
-
-## Como validar depois
-
-1. Selecionar empresa, processar planilha RFS008 com algumas chaves vazias.
-2. Confirmar notas em "Ausente no XML".
-3. Clicar em uma competência específica → arrastar XMLs daquelas notas no dropzone.
-4. Esperado: notas viram "OK"/"Divergente" e o toast mostra também "X salvo(s) na base".
-5. Clicar em "Nova Análise", reenviar a mesma planilha sem reenviar XMLs → as mesmas notas devem aparecer já reconciliadas (vindas da base histórica).
+- `src/components/ResultsSection.tsx` — adicionar prop `readOnly` e ocultar controles de mutação quando ativa.
+- `src/routes/fechamentos.tsx` — tornar linhas clicáveis e adicionar botão "Abrir".
+- `src/routes/fechamentos.$fechamentoId.tsx` — **novo** arquivo, página de detalhe.

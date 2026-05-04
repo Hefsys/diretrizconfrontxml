@@ -26,6 +26,8 @@ interface ResultsSectionProps {
   summary: ConfrontoSummary;
   onReset: () => void;
   empresaId?: string;
+  readOnly?: boolean;
+  resetLabel?: string;
 }
 
 const STATUS_CONFIG: Record<ConfrontoStatus, { label: string; color: string; emoji: string }> = {
@@ -67,7 +69,7 @@ function formatCnpj(v: string): string {
   return v;
 }
 
-export function ResultsSection({ results: initialResults, summary: initialSummary, onReset, empresaId }: ResultsSectionProps) {
+export function ResultsSection({ results: initialResults, summary: initialSummary, onReset, empresaId, readOnly = false, resetLabel }: ResultsSectionProps) {
   const { user } = useAuth();
   const [results, setResults] = useState<ConfrontoResult[]>(initialResults);
   const [summary, setSummary] = useState<ConfrontoSummary>(initialSummary);
@@ -246,7 +248,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     toast.success('Registro removido');
   };
 
-  const showDropzone = selectedMonth !== 'todos' && summaryForMonth.ausentes > 0;
+  const showDropzone = !readOnly && selectedMonth !== 'todos' && summaryForMonth.ausentes > 0;
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -275,13 +277,13 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             className="hidden"
             onChange={handleXmlFiles}
           />
-          {summaryForMonth.ausentes > 0 && (
+          {!readOnly && summaryForMonth.ausentes > 0 && (
             <Button variant="outline" onClick={handleAddXmlsClick} disabled={isAddingXmls}>
               {isAddingXmls ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Adicionar XMLs
             </Button>
           )}
-          {canCloseMonth && (
+          {!readOnly && canCloseMonth && (
             <Button
               variant="outline"
               onClick={() => setConfirmCloseOpen(true)}
@@ -292,7 +294,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
               Fechar mês
             </Button>
           )}
-          {isMonthClosed && (
+          {(readOnly || isMonthClosed) && (
             <Badge variant="outline" className="border-diretriz-red/40 text-diretriz-red flex items-center gap-1 px-3">
               <Lock className="h-3 w-3" /> Mês fechado
             </Badge>
@@ -301,7 +303,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             Exportar Excel
           </Button>
           <Button onClick={onReset} className="bg-diretriz-red text-white hover:bg-diretriz-red/90">
-            Nova Análise
+            {resetLabel ?? 'Nova Análise'}
           </Button>
         </div>
       </div>
@@ -425,7 +427,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
                     <TableHead className="text-right">Valor XML</TableHead>
                     <TableHead className="text-right">Diferença</TableHead>
                     <TableHead>Chave NF-e</TableHead>
-                    <TableHead className="w-[60px] text-right">Ações</TableHead>
+                    {!readOnly && <TableHead className="w-[60px] text-right">Ações</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -469,27 +471,29 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                onClick={() => setDeleteIdx(i)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="left">Excluir registro</TooltipContent>
-                          </Tooltip>
-                        </TableCell>
+                        {!readOnly && (
+                          <TableCell className="text-right">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  onClick={() => setDeleteIdx(i)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="left">Excluir registro</TooltipContent>
+                            </Tooltip>
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
                   {filtered.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
+                      <TableCell colSpan={readOnly ? 10 : 11} className="py-8 text-center text-muted-foreground">
                         Nenhum registro encontrado para este filtro.
                       </TableCell>
                     </TableRow>
