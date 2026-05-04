@@ -77,6 +77,7 @@ export type Database = {
           id: string
           resultados: Json
           resumo: Json
+          titulo: string | null
         }
         Insert: {
           competencia: string
@@ -86,6 +87,7 @@ export type Database = {
           id?: string
           resultados: Json
           resumo: Json
+          titulo?: string | null
         }
         Update: {
           competencia?: string
@@ -95,6 +97,7 @@ export type Database = {
           id?: string
           resultados?: Json
           resumo?: Json
+          titulo?: string | null
         }
         Relationships: [
           {
