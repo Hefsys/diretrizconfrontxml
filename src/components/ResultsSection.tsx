@@ -329,7 +329,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             className="hidden"
             onChange={handleXmlFiles}
           />
-          {canEditXmls && summaryForMonth.ausentes > 0 && (
+          {canEditXmls && (
             <Button variant="outline" onClick={handleAddXmlsClick} disabled={isAddingXmls}>
               {isAddingXmls ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Adicionar XMLs

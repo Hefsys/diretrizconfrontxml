@@ -47,6 +47,7 @@ function FechamentoDetailPage() {
   const [empresaNome, setEmpresaNome] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [canUpdateFechamento, setCanUpdateFechamento] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate({ to: '/auth' });
@@ -56,6 +57,7 @@ function FechamentoDetailPage() {
     if (!user) return;
     let cancelled = false;
     setLoading(true);
+    setCanUpdateFechamento(false);
     supabase
       .from('fechamentos_mensais')
       .select('*')
@@ -70,6 +72,13 @@ function FechamentoDetailPage() {
         }
         const f = data as unknown as FechamentoMensal;
         setFechamento(f);
+        const isAuthor = user.id === f.fechado_por;
+        if (isAuthor) {
+          setCanUpdateFechamento(true);
+        } else {
+          const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' });
+          if (!cancelled) setCanUpdateFechamento(!!isAdmin);
+        }
         const { data: emp } = await supabase
           .from('empresas')
           .select('razao_social')
@@ -148,7 +157,7 @@ function FechamentoDetailPage() {
           resetLabel="Voltar"
           onReset={() => navigate({ to: '/fechamentos' })}
           onUpdate={
-            user.id === fechamento.fechado_por
+            canUpdateFechamento
               ? async (newResults: ConfrontoResult[], newSummary: ConfrontoSummary) => {
                   const res = await atualizarFechamento({
                     id: fechamento.id,
