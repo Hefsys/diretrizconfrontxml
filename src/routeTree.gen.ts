@@ -14,7 +14,7 @@ import { Route as FechamentosRouteImport } from './routes/fechamentos'
 import { Route as EmpresasRouteImport } from './routes/empresas'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as FechamentosFechamentoIdRouteImport } from './routes/fechamentos.$fechamentoId'
+import { Route as FechamentosFechamentoIdRouteImport } from './routes/fechamentos_.$fechamentoId'
 
 const XmlsRoute = XmlsRouteImport.update({
   id: '/xmls',
@@ -42,16 +42,16 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const FechamentosFechamentoIdRoute = FechamentosFechamentoIdRouteImport.update({
-  id: '/$fechamentoId',
-  path: '/$fechamentoId',
-  getParentRoute: () => FechamentosRoute,
+  id: '/fechamentos_/$fechamentoId',
+  path: '/fechamentos/$fechamentoId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/empresas': typeof EmpresasRoute
-  '/fechamentos': typeof FechamentosRouteWithChildren
+  '/fechamentos': typeof FechamentosRoute
   '/xmls': typeof XmlsRoute
   '/fechamentos/$fechamentoId': typeof FechamentosFechamentoIdRoute
 }
@@ -59,7 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/empresas': typeof EmpresasRoute
-  '/fechamentos': typeof FechamentosRouteWithChildren
+  '/fechamentos': typeof FechamentosRoute
   '/xmls': typeof XmlsRoute
   '/fechamentos/$fechamentoId': typeof FechamentosFechamentoIdRoute
 }
@@ -68,9 +68,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/empresas': typeof EmpresasRoute
-  '/fechamentos': typeof FechamentosRouteWithChildren
+  '/fechamentos': typeof FechamentosRoute
   '/xmls': typeof XmlsRoute
-  '/fechamentos/$fechamentoId': typeof FechamentosFechamentoIdRoute
+  '/fechamentos_/$fechamentoId': typeof FechamentosFechamentoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -96,15 +96,16 @@ export interface FileRouteTypes {
     | '/empresas'
     | '/fechamentos'
     | '/xmls'
-    | '/fechamentos/$fechamentoId'
+    | '/fechamentos_/$fechamentoId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   EmpresasRoute: typeof EmpresasRoute
-  FechamentosRoute: typeof FechamentosRouteWithChildren
+  FechamentosRoute: typeof FechamentosRoute
   XmlsRoute: typeof XmlsRoute
+  FechamentosFechamentoIdRoute: typeof FechamentosFechamentoIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -144,34 +145,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/fechamentos/$fechamentoId': {
-      id: '/fechamentos/$fechamentoId'
-      path: '/$fechamentoId'
+    '/fechamentos_/$fechamentoId': {
+      id: '/fechamentos_/$fechamentoId'
+      path: '/fechamentos/$fechamentoId'
       fullPath: '/fechamentos/$fechamentoId'
       preLoaderRoute: typeof FechamentosFechamentoIdRouteImport
-      parentRoute: typeof FechamentosRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
-
-interface FechamentosRouteChildren {
-  FechamentosFechamentoIdRoute: typeof FechamentosFechamentoIdRoute
-}
-
-const FechamentosRouteChildren: FechamentosRouteChildren = {
-  FechamentosFechamentoIdRoute: FechamentosFechamentoIdRoute,
-}
-
-const FechamentosRouteWithChildren = FechamentosRoute._addFileChildren(
-  FechamentosRouteChildren,
-)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   EmpresasRoute: EmpresasRoute,
-  FechamentosRoute: FechamentosRouteWithChildren,
+  FechamentosRoute: FechamentosRoute,
   XmlsRoute: XmlsRoute,
+  FechamentosFechamentoIdRoute: FechamentosFechamentoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
