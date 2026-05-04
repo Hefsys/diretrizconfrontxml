@@ -36,6 +36,8 @@ interface ResultsSectionProps {
   empresaId?: string;
   readOnly?: boolean;
   resetLabel?: string;
+  /** Quando fornecido em readOnly, permite adicionar XMLs e persiste a análise atualizada. */
+  onUpdate?: (results: ConfrontoResult[], summary: ConfrontoSummary) => Promise<void> | void;
 }
 
 const STATUS_CONFIG: Record<ConfrontoStatus, { label: string; color: string; emoji: string }> = {
