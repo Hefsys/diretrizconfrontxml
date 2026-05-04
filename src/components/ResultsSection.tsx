@@ -344,17 +344,6 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
               Adicionar XMLs
             </Button>
           )}
-          {!readOnly && canCloseMonth && (
-            <Button
-              variant="outline"
-              onClick={() => setConfirmCloseOpen(true)}
-              disabled={isClosing}
-              className="border-diretriz-red/40 text-diretriz-red hover:bg-diretriz-red/5"
-            >
-              {isClosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-              Fechar mês
-            </Button>
-          )}
           {(readOnly || isMonthClosed) && (
             <Badge variant="outline" className="border-diretriz-red/40 text-diretriz-red flex items-center gap-1 px-3">
               <Lock className="h-3 w-3" /> Mês fechado
@@ -363,9 +352,27 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
           <Button variant="outline" onClick={() => exportResults(resultsForMonth)}>
             Exportar Excel
           </Button>
-          <Button onClick={onReset} className="bg-diretriz-red text-white hover:bg-diretriz-red/90">
-            {resetLabel ?? 'Nova Análise'}
-          </Button>
+          {!readOnly && (
+            <Button variant="outline" onClick={onReset}>
+              {resetLabel ?? 'Nova Análise'}
+            </Button>
+          )}
+          {canSave && (
+            <Button
+              onClick={() => setConfirmCloseOpen(true)}
+              disabled={isClosing}
+              className="bg-diretriz-red text-white hover:bg-diretriz-red/90"
+              title="Salva esta análise em Fechamentos"
+            >
+              {isClosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar análise
+            </Button>
+          )}
+          {readOnly && (
+            <Button onClick={onReset} className="bg-diretriz-red text-white hover:bg-diretriz-red/90">
+              {resetLabel ?? 'Nova Análise'}
+            </Button>
+          )}
         </div>
       </div>
 
