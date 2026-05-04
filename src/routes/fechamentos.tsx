@@ -142,9 +142,10 @@ function FechamentosPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Título</TableHead>
                   <TableHead>Competência</TableHead>
                   <TableHead>Empresa</TableHead>
-                  <TableHead>Fechado em</TableHead>
+                  <TableHead>Salvo em</TableHead>
                   <TableHead className="text-right">OK</TableHead>
                   <TableHead className="text-right">Divergentes</TableHead>
                   <TableHead className="text-right">Ausentes</TableHead>
@@ -160,10 +161,13 @@ function FechamentosPage() {
                     className="cursor-pointer hover:bg-muted/40"
                     onClick={() => navigate({ to: '/fechamentos/$fechamentoId', params: { fechamentoId: f.id } })}
                   >
+                    <TableCell className="font-medium text-diretriz-dark">
+                      {f.titulo || <span className="italic text-muted-foreground">— sem título —</span>}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="font-mono">{formatMonthLabel(f.competencia)}</Badge>
                     </TableCell>
-                    <TableCell className="font-medium">{empresaNome(f.empresa_id)}</TableCell>
+                    <TableCell className="text-sm">{empresaNome(f.empresa_id)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(f.fechado_em).toLocaleString('pt-BR')}
                     </TableCell>

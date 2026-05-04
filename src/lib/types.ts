@@ -53,6 +53,7 @@ export interface FechamentoMensal {
   id: string;
   empresa_id: string;
   competencia: string;
+  titulo: string | null;
   fechado_por: string | null;
   fechado_em: string;
   resumo: ConfrontoSummary;

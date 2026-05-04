@@ -13,13 +13,20 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import type { ConfrontoResult, ConfrontoSummary, ConfrontoStatus } from '@/lib/types';
 import { exportResults } from '@/lib/export-excel';
 import { getMonthKey } from '@/lib/confronto-engine';
-import { fecharMes, listarCompetenciasFechadas } from '@/lib/fechamentos';
+import { fecharMes } from '@/lib/fechamentos';
 import { useAuth } from '@/hooks/useAuth';
 
 interface ResultsSectionProps {
@@ -81,16 +88,12 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
   const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
   const [isAddingXmls, setIsAddingXmls] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [competenciasFechadas, setCompetenciasFechadas] = useState<Set<string>>(new Set());
+  const [competenciasFechadas] = useState<Set<string>>(new Set());
   const [isClosing, setIsClosing] = useState(false);
-  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveTitulo, setSaveTitulo] = useState('');
+  const [saveCompetencia, setSaveCompetencia] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Load list of closed competencies for this empresa
-  useEffect(() => {
-    if (!empresaId) return;
-    listarCompetenciasFechadas(empresaId).then(setCompetenciasFechadas);
-  }, [empresaId]);
 
   // Months available in the dataset, sorted chronologically with counts
   const monthsAvailable = useMemo(() => {
@@ -135,86 +138,63 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     return arr;
   }, [resultsForMonth, filter, searchNf]);
 
-  const isMonthClosed = selectedMonth !== 'todos' && competenciasFechadas.has(selectedMonth);
-
-  // Competências disponíveis nos resultados que ainda não foram fechadas (exclui "sem-data")
-  const competenciasSalvaveis = useMemo(
-    () =>
-      monthsAvailable
-        .map((m) => m.key)
-        .filter((k) => k !== 'sem-data' && !competenciasFechadas.has(k)),
-    [monthsAvailable, competenciasFechadas]
+  // Competências válidas para escolher como rótulo da análise (exclui "sem-data")
+  const competenciasOpcoes = useMemo(
+    () => monthsAvailable.map((m) => m.key).filter((k) => k !== 'sem-data'),
+    [monthsAvailable]
   );
 
-  const canSave = !!empresaId && !!user && !readOnly && (
-    selectedMonth === 'todos'
-      ? competenciasSalvaveis.length > 0
-      : !isMonthClosed && selectedMonth !== 'sem-data'
-  );
+  // Default da competência: mês selecionado, ou a mais frequente
+  const defaultCompetencia = useMemo(() => {
+    if (selectedMonth !== 'todos' && selectedMonth !== 'sem-data') return selectedMonth;
+    if (competenciasOpcoes.length === 0) return '';
+    let best = competenciasOpcoes[0];
+    let bestCount = 0;
+    for (const m of monthsAvailable) {
+      if (m.key === 'sem-data') continue;
+      if (m.count > bestCount) { best = m.key; bestCount = m.count; }
+    }
+    return best;
+  }, [selectedMonth, competenciasOpcoes, monthsAvailable]);
 
-  const handleCloseMonth = async () => {
+  const canSave = !!empresaId && !!user && !readOnly && results.length > 0 && competenciasOpcoes.length > 0;
+
+  const openSaveDialog = () => {
+    const comp = defaultCompetencia;
+    setSaveCompetencia(comp);
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
+    setSaveTitulo(comp ? `Análise ${formatMonthLabel(comp)} — ${dataAtual}` : `Análise — ${dataAtual}`);
+    setSaveDialogOpen(true);
+  };
+
+  const handleSaveAnalise = async () => {
     if (!empresaId || !user) return;
+    const titulo = saveTitulo.trim();
+    if (!titulo) {
+      toast.error('Informe um título para a análise');
+      return;
+    }
+    if (!saveCompetencia) {
+      toast.error('Selecione a competência');
+      return;
+    }
     setIsClosing(true);
     try {
-      // Determina quais competências salvar
-      const targets: string[] = selectedMonth === 'todos'
-        ? competenciasSalvaveis
-        : [selectedMonth];
-
-      let salvas = 0;
-      let jaFechadas = 0;
-      let erros = 0;
-      const novasFechadas = new Set(competenciasFechadas);
-
-      for (const comp of targets) {
-        const resultadosComp = results.filter((r) => getMonthKey(r.data) === comp);
-        const resumoComp: ConfrontoSummary = {
-          totalPlanilha: resultadosComp.filter((r) => r.valorPlanilha !== null).length,
-          totalXmls: resultadosComp.filter((r) => r.valorXml !== null).length,
-          ok: resultadosComp.filter((r) => r.status === 'ok').length,
-          divergentes: resultadosComp.filter((r) => r.status === 'divergente').length,
-          ausentes: resultadosComp.filter((r) => r.status === 'ausente_xml').length,
-          naoEscriturados: resultadosComp.filter((r) => r.status === 'nao_escriturado').length,
-          canceladas: resultadosComp.filter((r) => r.status === 'cancelada').length,
-        };
-        const res = await fecharMes({
-          empresaId,
-          competencia: comp,
-          fechadoPor: user.id,
-          resumo: resumoComp,
-          resultados: resultadosComp,
-        });
-        if (res.ok) {
-          salvas += 1;
-          novasFechadas.add(comp);
-        } else if (res.error?.includes('já foi fechada')) {
-          jaFechadas += 1;
-          novasFechadas.add(comp);
-        } else {
-          erros += 1;
-        }
-      }
-
-      setCompetenciasFechadas(novasFechadas);
-
-      if (salvas > 0) {
-        const partes: string[] = [];
-        partes.push(`${salvas} análise${salvas === 1 ? '' : 's'} salva${salvas === 1 ? '' : 's'}`);
-        if (jaFechadas > 0) partes.push(`${jaFechadas} já fechada${jaFechadas === 1 ? '' : 's'}`);
-        if (erros > 0) partes.push(`${erros} com erro`);
-        toast.success(partes.join(' · '));
-        // Exporta Excel apenas quando uma única competência foi salva
-        if (targets.length === 1) {
-          const comp = targets[0];
-          exportResults(results.filter((r) => getMonthKey(r.data) === comp));
-        }
-        setConfirmCloseOpen(false);
+      const res = await fecharMes({
+        empresaId,
+        competencia: saveCompetencia,
+        titulo,
+        fechadoPor: user.id,
+        resumo: summary,
+        resultados: results,
+      });
+      if (res.ok) {
+        toast.success('Análise salva em Fechamentos');
+        exportResults(results);
+        setSaveDialogOpen(false);
         navigate({ to: '/fechamentos' });
-      } else if (erros > 0) {
-        toast.error('Erro ao salvar análise');
       } else {
-        toast.info('Nenhuma competência nova para salvar');
-        setConfirmCloseOpen(false);
+        toast.error(res.error || 'Erro ao salvar análise');
       }
     } finally {
       setIsClosing(false);
@@ -344,9 +324,9 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
               Adicionar XMLs
             </Button>
           )}
-          {(readOnly || isMonthClosed) && (
+          {readOnly && (
             <Badge variant="outline" className="border-diretriz-red/40 text-diretriz-red flex items-center gap-1 px-3">
-              <Lock className="h-3 w-3" /> Mês fechado
+              <Lock className="h-3 w-3" /> Análise salva
             </Badge>
           )}
           <Button variant="outline" onClick={() => exportResults(resultsForMonth)}>
@@ -359,7 +339,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
           )}
           {canSave && (
             <Button
-              onClick={() => setConfirmCloseOpen(true)}
+              onClick={openSaveDialog}
               disabled={isClosing}
               className="bg-diretriz-red text-white hover:bg-diretriz-red/90"
               title="Salva esta análise em Fechamentos"
@@ -590,28 +570,57 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {selectedMonth === 'todos'
-                ? `Salvar ${competenciasSalvaveis.length} competência${competenciasSalvaveis.length === 1 ? '' : 's'}?`
-                : `Salvar análise de ${formatMonthLabel(selectedMonth)}?`}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {selectedMonth === 'todos'
-                ? `As competências serão salvas em Fechamentos: ${competenciasSalvaveis.map(formatMonthLabel).join(', ')}. Cada competência fica congelada e não pode ser reaberta.`
-                : `Esta análise será salva em Fechamentos e o Excel será gerado. A competência fica congelada e não pode ser reaberta.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isClosing}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCloseMonth} disabled={isClosing} className="bg-diretriz-red text-white hover:bg-diretriz-red/90">
-              {isClosing ? 'Salvando…' : 'Salvar análise'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Dialog open={saveDialogOpen} onOpenChange={(o) => !isClosing && setSaveDialogOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Salvar análise em Fechamentos</DialogTitle>
+            <DialogDescription>
+              Defina um título para identificar esta análise e a competência (mês de referência) à qual ela pertence.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="save-titulo">Título da análise</Label>
+              <Input
+                id="save-titulo"
+                value={saveTitulo}
+                onChange={(e) => setSaveTitulo(e.target.value)}
+                placeholder="Ex.: Fechamento oficial Mar/26"
+                disabled={isClosing}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="save-competencia">Competência</Label>
+              <Select value={saveCompetencia} onValueChange={setSaveCompetencia} disabled={isClosing}>
+                <SelectTrigger id="save-competencia">
+                  <SelectValue placeholder="Selecione a competência" />
+                </SelectTrigger>
+                <SelectContent>
+                  {competenciasOpcoes.map((c) => (
+                    <SelectItem key={c} value={c}>{formatMonthLabel(c)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {results.length} registro{results.length === 1 ? '' : 's'} serão salvos nesta análise.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveDialogOpen(false)} disabled={isClosing}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveAnalise}
+              disabled={isClosing || !saveTitulo.trim() || !saveCompetencia}
+              className="bg-diretriz-red text-white hover:bg-diretriz-red/90"
+            >
+              {isClosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar análise
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
