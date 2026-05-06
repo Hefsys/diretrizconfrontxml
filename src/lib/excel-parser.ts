@@ -74,13 +74,14 @@ interface ColumnMap {
   vBC: number;
   vICMS: number;
   vST: number;
+  cfop: number;
 }
 
 function mapColumns(headerRow: unknown[]): ColumnMap {
   const map: ColumnMap = {
     nNF: -1, serie: -1, dataEntrada: -1, dataDocumento: -1,
     cnpj: -1, nome: -1, chNFe: -1, valorContabil: -1,
-    vBC: -1, vICMS: -1, vST: -1,
+    vBC: -1, vICMS: -1, vST: -1, cfop: -1,
   };
 
   headerRow.forEach((cell, idx) => {
