@@ -19,7 +19,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Download, LogOut, Lock, Eye, Trash2, Loader2 } from 'lucide-react';
+import { Download, LogOut, Lock, Eye, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
 
 export const Route = createFileRoute('/fechamentos')({

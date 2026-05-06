@@ -1,32 +1,25 @@
-## Problema
+## Causa provável
 
-Boa parte dos "Ausentes no XML" são CTe (Conhecimento de Transporte — frete), não NF-e. Eles entram na planilha de ICMS pelo CFOP 2353 (e similares de frete), mas nunca terão XML de NF-e correspondente, poluindo o confronto.
+Leonardo acessa a URL **publicada** (`diretrizconfrontxml.lovable.app`), que serve a última versão **publicada** do app. As últimas mudanças (CFOP de frete como OK, ajuste de exclusão de fechamentos, etc.) foram feitas no preview e provavelmente **ainda não foram publicadas**. Por isso ele vê comportamento antigo.
 
-## Solução
+Adicionalmente, a tabela `fechamentos_mensais` está vazia no banco neste momento — então mesmo na versão nova nenhum usuário veria fechamentos até que algum seja salvo de novo.
 
-Detectar a coluna **CFOP** na planilha (provavelmente AG no RFS008) e **ignorar linhas de frete/CTe** antes do confronto, para que não apareçam como ausentes.
+A política de RLS de leitura (`USING true`) e o código de `listarFechamentos()` já permitem que qualquer usuário autenticado enxergue todos os fechamentos — não há bug de visibilidade entre usuários.
 
-### CFOPs a excluir (frete / serviço de transporte)
+## Ações propostas
 
-Lista padrão tratada como CTe:
-- `1352`, `2352`, `3352` — aquisição de serviço de transporte por industrial
-- `1353`, `2353`, `3353` — aquisição de serviço de transporte por comercial
-- `1356`, `2356` — aquisição de serviço de transporte (combustível/lubrif.)
-- `1360`, `2360` — aquisição de serviço de transporte (substituto)
-- `1932`, `2932` — aquisição de serviço de transporte iniciado em UF diversa
+1. **Republicar o app** para que a URL publicada passe a servir as últimas mudanças (correções de CT-e/CFOP frete, exclusão, atualização de análise).
+   - Após publicar, pedir ao Leonardo para dar um **hard refresh** (Ctrl+Shift+R / Cmd+Shift+R) para descartar cache do navegador.
 
-Se preferir só `2353` por enquanto, ajustamos a constante.
+2. **Adicionar um cache-buster leve no header da página de Fechamentos**: ao montar a página, forçar `listarFechamentos` a rodar sempre (já roda no `useEffect`) e exibir um indicador "Atualizado em HH:MM" + botão "Recarregar" para o usuário poder forçar refresh manualmente sem confiar em cache.
 
-## Mudanças técnicas
+3. **Validação rápida pós-publicação**: pedir ao Antônio para salvar um fechamento de teste e ao Leonardo para abrir `/fechamentos` — confirmar que aparece para ambos.
 
-**`src/lib/excel-parser.ts`**
-1. Adicionar `cfop: number` ao `ColumnMap` (em `src/lib/types.ts` opcionalmente expor `cfop` em `ExcelNfeData`, mas pode ficar interno).
-2. Em `mapColumns`, detectar header contendo `cfop` ou `c.f.o.p`.
-3. Em `parseSheet`, após extrair a linha, se `colMap.cfop >= 0` e o CFOP estiver na lista de CFOPs de frete, **pular a linha** (não incluir nos resultados).
-4. Constante exportada `CFOPS_FRETE_IGNORADOS = new Set(['1352','2352','1353','2353', ...])` no topo do arquivo.
+## Não vou alterar
 
-Não precisa migration nem mudança em RLS. Confronto e fechamentos existentes não são afetados — só novos uploads passam a filtrar CTe.
+- RLS de `fechamentos_mensais` (já está correta para o caso de uso multi-usuário da empresa).
+- Lógica de `listarFechamentos` (já busca todos sem filtro de usuário).
 
 ## Observação
 
-Fechamentos já salvos continuam mostrando os CTe como ausentes (foram persistidos). O filtro vale para novos confrontos. Se quiser, posso adicionar um botão "Reprocessar" no fechamento para reaplicar o filtro — me avise.
+Se após publicar e dar hard refresh o Leonardo ainda não ver fechamentos que o Antônio salvou, abro a aba Network no navegador dele para confirmar a resposta da chamada `GET /rest/v1/fechamentos_mensais` — mas com a configuração atual isso seria inesperado.
