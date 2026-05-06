@@ -58,6 +58,17 @@ function FechamentosPage() {
   const [loading, setLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FechamentoMensal | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+
+  const reload = () => {
+    if (!user) return;
+    setLoading(true);
+    listarFechamentos(empresaId || undefined).then((d) => {
+      setFechamentos(d);
+      setLastRefreshedAt(new Date());
+      setLoading(false);
+    });
+  };
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
