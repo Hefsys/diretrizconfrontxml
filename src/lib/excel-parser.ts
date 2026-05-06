@@ -152,6 +152,12 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     // Skip if nNF is not numeric
     if (nNF && !/^\d+$/.test(nNF)) continue;
 
+    // Skip CTe (frete) — não há NF-e correspondente
+    if (colMap.cfop >= 0) {
+      const cfopRaw = String(row[colMap.cfop] ?? '').replace(/\D/g, '');
+      if (cfopRaw && CFOPS_FRETE_IGNORADOS.has(cfopRaw)) continue;
+    }
+
     const valorStr = colMap.valorContabil >= 0 ? row[colMap.valorContabil] : 0;
     const valor = typeof valorStr === 'number' ? valorStr : parseFloat(String(valorStr).replace(/[^\d,.\-]/g, '').replace(',', '.')) || 0;
 
