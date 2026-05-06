@@ -145,17 +145,33 @@ function FechamentosPage() {
             </h1>
             <p className="text-sm text-muted-foreground">Histórico de competências congeladas por empresa.</p>
           </div>
-          <Select value={empresaId || 'todos'} onValueChange={(v) => setEmpresaId(v === 'todos' ? '' : v)}>
-            <SelectTrigger className="w-[280px]">
-              <SelectValue placeholder="Filtrar por empresa" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todas as empresas</SelectItem>
-              {empresas.map((e) => (
-                <SelectItem key={e.id} value={e.id}>{e.razao_social}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={reload}
+              disabled={loading}
+              title="Recarregar lista"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <span className="ml-2 hidden sm:inline">
+                {lastRefreshedAt
+                  ? `Atualizado ${lastRefreshedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                  : 'Recarregar'}
+              </span>
+            </Button>
+            <Select value={empresaId || 'todos'} onValueChange={(v) => setEmpresaId(v === 'todos' ? '' : v)}>
+              <SelectTrigger className="w-[280px]">
+                <SelectValue placeholder="Filtrar por empresa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todas as empresas</SelectItem>
+                {empresas.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>{e.razao_social}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <Card>
