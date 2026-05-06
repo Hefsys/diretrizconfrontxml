@@ -31,6 +31,7 @@ export interface ExcelNfeData {
   vST: number;
   rowIndex: number;
   sheetName: string;
+  isFrete?: boolean;
 }
 
 export interface Empresa {

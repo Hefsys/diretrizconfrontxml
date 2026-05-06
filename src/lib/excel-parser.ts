@@ -152,10 +152,11 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     // Skip if nNF is not numeric
     if (nNF && !/^\d+$/.test(nNF)) continue;
 
-    // Skip CTe (frete) — não há NF-e correspondente
+    // CTe (frete) — não há NF-e correspondente; marcar para entrar como OK
+    let isFrete = false;
     if (colMap.cfop >= 0) {
       const cfopRaw = String(row[colMap.cfop] ?? '').replace(/\D/g, '');
-      if (cfopRaw && CFOPS_FRETE_IGNORADOS.has(cfopRaw)) continue;
+      if (cfopRaw && CFOPS_FRETE_IGNORADOS.has(cfopRaw)) isFrete = true;
     }
 
     const valorStr = colMap.valorContabil >= 0 ? row[colMap.valorContabil] : 0;
@@ -181,6 +182,7 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
       vST: colMap.vST >= 0 ? parseCell(row[colMap.vST]) : 0,
       rowIndex: i,
       sheetName,
+      isFrete,
     });
   }
 
