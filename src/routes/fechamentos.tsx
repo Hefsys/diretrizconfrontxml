@@ -101,11 +101,8 @@ function FechamentosPage() {
 
   useEffect(() => {
     if (!user) return;
-    setLoading(true);
-    listarFechamentos(empresaId || undefined).then((d) => {
-      setFechamentos(d);
-      setLoading(false);
-    });
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, empresaId]);
 
   const empresaNome = (id: string) => empresas.find((e) => e.id === id)?.razao_social ?? '—';
