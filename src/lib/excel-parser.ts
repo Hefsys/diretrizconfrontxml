@@ -5,8 +5,19 @@ const HEADER_KEYWORDS = [
   'número', 'numero', 'nº nf', 'n° nf', 'nf', 'chave', 'chnfe',
   'cnpj', 'cpf', 'valor', 'contábil', 'contabil', 'emitente',
   'série', 'serie', 'entrada', 'documento', 'razão', 'razao', 'nome',
-  'base', 'icms', 'aliq',
+  'base', 'icms', 'aliq', 'cfop',
 ];
+
+// CFOPs de serviço de transporte (CTe) — não há NF-e correspondente, devem ser ignorados
+export const CFOPS_FRETE_IGNORADOS = new Set<string>([
+  '1352', '2352', '3352',
+  '1353', '2353', '3353',
+  '1354', '2354', '3354',
+  '1355', '2355', '3355',
+  '1356', '2356', '3356',
+  '1360', '2360',
+  '1932', '2932',
+]);
 
 function normalizeStr(s: string): string {
   return s
