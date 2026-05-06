@@ -1,47 +1,32 @@
-## Pedido
-1. **Excluir fechamentos** salvos.
-2. **Adicionar XMLs** a uma análise já salva (para reconciliar notas ausentes sem precisar refazer tudo).
+## Problema
 
-## Estado atual
-- `fechamentos_mensais` só tem policy de DELETE para admins; nenhum usuário do projeto é admin.
-- Não há policy de UPDATE — análises salvas são imutáveis.
-- A página de detalhe (`/fechamentos/<id>`) renderiza `ResultsSection` em `readOnly`, que esconde o botão "Adicionar XMLs" e a dropzone.
+Boa parte dos "Ausentes no XML" são CTe (Conhecimento de Transporte — frete), não NF-e. Eles entram na planilha de ICMS pelo CFOP 2353 (e similares de frete), mas nunca terão XML de NF-e correspondente, poluindo o confronto.
 
-## Plano
+## Solução
 
-### 1. Banco — relaxar RLS (migration)
-- `DROP` policy "Admins can delete fechamentos" e criar **"Authors or admins can delete fechamentos"** com `USING (auth.uid() = fechado_por OR has_role(auth.uid(), 'admin'))`.
-- `CREATE` policy **"Authors or admins can update fechamentos"** com a mesma condição (necessária para persistir XMLs adicionados à análise salva).
+Detectar a coluna **CFOP** na planilha (provavelmente AG no RFS008) e **ignorar linhas de frete/CTe** antes do confronto, para que não apareçam como ausentes.
 
-### 2. Excluir fechamento — listagem (`src/routes/fechamentos.tsx`)
-- Adicionar botão lixeira (`Trash2`) na coluna **Ações** ao lado do olho/download, visível apenas quando `f.fechado_por === user.id` (ou se admin no futuro).
-- Confirmação via `AlertDialog`: "Excluir esta análise? Esta ação não pode ser desfeita."
-- Ao confirmar: `supabase.from('fechamentos_mensais').delete().eq('id', f.id)` + atualiza estado local + toast.
+### CFOPs a excluir (frete / serviço de transporte)
 
-### 3. Adicionar XMLs em análise salva
-**`src/components/ResultsSection.tsx`:**
-- Nova prop opcional `onUpdate?: (results, summary) => Promise<void>`.
-- Em `readOnly`, se `onUpdate` estiver presente:
-  - Mostrar botão "Adicionar XMLs" e a dropzone (mesma condição: existirem ausentes no mês selecionado).
-  - Após o `processXmlFiles` reconciliar, chamar `await onUpdate(newResults, newSummary)` para persistir.
-- O badge "Análise salva" continua aparecendo para deixar claro o contexto, mas a análise pode ser **atualizada**.
+Lista padrão tratada como CTe:
+- `1352`, `2352`, `3352` — aquisição de serviço de transporte por industrial
+- `1353`, `2353`, `3353` — aquisição de serviço de transporte por comercial
+- `1356`, `2356` — aquisição de serviço de transporte (combustível/lubrif.)
+- `1360`, `2360` — aquisição de serviço de transporte (substituto)
+- `1932`, `2932` — aquisição de serviço de transporte iniciado em UF diversa
 
-**`src/lib/fechamentos.ts`:**
-- Nova função `atualizarFechamento(id, resumo, resultados)` que faz `UPDATE` em `fechamentos_mensais`.
+Se preferir só `2353` por enquanto, ajustamos a constante.
 
-**`src/routes/fechamentos_.$fechamentoId.tsx`:**
-- Passar `onUpdate` para `ResultsSection`. Implementação chama `atualizarFechamento(fechamentoId, summary, results)` e atualiza o estado local do `fechamento` com os novos dados (para o cabeçalho refletir).
-- Verificar `fechamento.fechado_por === user.id` para decidir se passa `onUpdate` (caso contrário não permite editar).
+## Mudanças técnicas
 
-### 4. Edge cases
-- Após excluir o fechamento aberto na detalhe, o usuário cai num 404 — mas como a exclusão acontece na listagem, não há esse problema.
-- Se o usuário não for o autor, botão lixeira e botão "Adicionar XMLs" não aparecem (somente leitura puro).
+**`src/lib/excel-parser.ts`**
+1. Adicionar `cfop: number` ao `ColumnMap` (em `src/lib/types.ts` opcionalmente expor `cfop` em `ExcelNfeData`, mas pode ficar interno).
+2. Em `mapColumns`, detectar header contendo `cfop` ou `c.f.o.p`.
+3. Em `parseSheet`, após extrair a linha, se `colMap.cfop >= 0` e o CFOP estiver na lista de CFOPs de frete, **pular a linha** (não incluir nos resultados).
+4. Constante exportada `CFOPS_FRETE_IGNORADOS = new Set(['1352','2352','1353','2353', ...])` no topo do arquivo.
 
-## Arquivos alterados
-- Migration SQL (RLS de DELETE/UPDATE em `fechamentos_mensais`)
-- `src/lib/fechamentos.ts` — nova função `atualizarFechamento`
-- `src/components/ResultsSection.tsx` — nova prop `onUpdate`, libera dropzone/botão XML em readOnly quando há `onUpdate`
-- `src/routes/fechamentos.tsx` — botão lixeira + diálogo de confirmação
-- `src/routes/fechamentos_.$fechamentoId.tsx` — passa `onUpdate` quando o usuário é autor
+Não precisa migration nem mudança em RLS. Confronto e fechamentos existentes não são afetados — só novos uploads passam a filtrar CTe.
 
-Confirma?
+## Observação
+
+Fechamentos já salvos continuam mostrando os CTe como ausentes (foram persistidos). O filtro vale para novos confrontos. Se quiser, posso adicionar um botão "Reprocessar" no fechamento para reaplicar o filtro — me avise.

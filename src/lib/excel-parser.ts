@@ -5,8 +5,19 @@ const HEADER_KEYWORDS = [
   'número', 'numero', 'nº nf', 'n° nf', 'nf', 'chave', 'chnfe',
   'cnpj', 'cpf', 'valor', 'contábil', 'contabil', 'emitente',
   'série', 'serie', 'entrada', 'documento', 'razão', 'razao', 'nome',
-  'base', 'icms', 'aliq',
+  'base', 'icms', 'aliq', 'cfop',
 ];
+
+// CFOPs de serviço de transporte (CTe) — não há NF-e correspondente, devem ser ignorados
+export const CFOPS_FRETE_IGNORADOS = new Set<string>([
+  '1352', '2352', '3352',
+  '1353', '2353', '3353',
+  '1354', '2354', '3354',
+  '1355', '2355', '3355',
+  '1356', '2356', '3356',
+  '1360', '2360',
+  '1932', '2932',
+]);
 
 function normalizeStr(s: string): string {
   return s
@@ -63,18 +74,20 @@ interface ColumnMap {
   vBC: number;
   vICMS: number;
   vST: number;
+  cfop: number;
 }
 
 function mapColumns(headerRow: unknown[]): ColumnMap {
   const map: ColumnMap = {
     nNF: -1, serie: -1, dataEntrada: -1, dataDocumento: -1,
     cnpj: -1, nome: -1, chNFe: -1, valorContabil: -1,
-    vBC: -1, vICMS: -1, vST: -1,
+    vBC: -1, vICMS: -1, vST: -1, cfop: -1,
   };
 
   headerRow.forEach((cell, idx) => {
     const t = cell ? normalizeStr(String(cell)) : '';
     if (t.includes('chave') || t.includes('chnfe')) map.chNFe = idx;
+    else if (t.includes('cfop') || t.includes('c.f.o.p')) map.cfop = idx;
     else if (t.includes('numero') || t.includes('nº') || t.includes('n°') || t === 'nf') map.nNF = idx;
     else if (t.includes('serie') || t.includes('sub')) {
       if (map.serie === -1) map.serie = idx;
@@ -138,6 +151,12 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     if (!nNF && !cnpj) continue;
     // Skip if nNF is not numeric
     if (nNF && !/^\d+$/.test(nNF)) continue;
+
+    // Skip CTe (frete) — não há NF-e correspondente
+    if (colMap.cfop >= 0) {
+      const cfopRaw = String(row[colMap.cfop] ?? '').replace(/\D/g, '');
+      if (cfopRaw && CFOPS_FRETE_IGNORADOS.has(cfopRaw)) continue;
+    }
 
     const valorStr = colMap.valorContabil >= 0 ? row[colMap.valorContabil] : 0;
     const valor = typeof valorStr === 'number' ? valorStr : parseFloat(String(valorStr).replace(/[^\d,.\-]/g, '').replace(',', '.')) || 0;
