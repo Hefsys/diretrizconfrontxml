@@ -187,12 +187,12 @@ export function runConfronto(
       });
     } else {
       results.push({
-        status: 'ausente_xml',
+        status: row.isFrete ? 'ok' : 'ausente_xml',
         nNF: row.nNF,
         serie: row.serie,
         data: row.dataDocumento || row.dataEntrada,
         cnpjEmitente: row.cnpjEmitente,
-        nomeEmitente: row.nomeEmitente,
+        nomeEmitente: row.nomeEmitente || (row.isFrete ? 'CT-e (Frete)' : ''),
         valorPlanilha: row.valorContabil,
         valorXml: null,
         diferenca: null,
