@@ -229,23 +229,22 @@ export function runConfronto(
     }
   }
 
-  // Find XMLs not in spreadsheet
-  for (const xml of xmlData) {
-    const key = xml.chNFe || `${xml.nNF}_${cleanCnpj(xml.cnpjEmitente)}`;
-    if (!matchedXmlKeys.has(key)) {
-      results.push({
-        status: xml.cancelada ? 'cancelada' : 'nao_escriturado',
-        nNF: xml.nNF,
-        serie: xml.serie,
-        data: xml.dhEmi,
-        cnpjEmitente: xml.cnpjEmitente,
-        nomeEmitente: xml.xNome,
-        valorPlanilha: null,
-        valorXml: xml.vNF,
-        diferenca: null,
-        chNFe: xml.chNFe,
-      });
-    }
+  // Find XMLs not used in spreadsheet matching
+  for (let i = 0; i < xmlData.length; i++) {
+    if (usedXmlIdx.has(i)) continue;
+    const xml = xmlData[i];
+    results.push({
+      status: xml.cancelada ? 'cancelada' : 'nao_escriturado',
+      nNF: xml.nNF,
+      serie: xml.serie,
+      data: xml.dhEmi,
+      cnpjEmitente: xml.cnpjEmitente,
+      nomeEmitente: xml.xNome,
+      valorPlanilha: null,
+      valorXml: xml.vNF,
+      diferenca: null,
+      chNFe: xml.chNFe,
+    });
   }
 
   return { results, summary: recomputeSummary(results) };
