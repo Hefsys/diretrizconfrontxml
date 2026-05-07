@@ -1,25 +1,28 @@
-## Causa provável
+## Problema
 
-Leonardo acessa a URL **publicada** (`diretrizconfrontxml.lovable.app`), que serve a última versão **publicada** do app. As últimas mudanças (CFOP de frete como OK, ajuste de exclusão de fechamentos, etc.) foram feitas no preview e provavelmente **ainda não foram publicadas**. Por isso ele vê comportamento antigo.
+Quando você anexa os XMLs na tela inicial e clica em "Processar Confronto", o resultado mostra todas as notas como "Ausente no XML". Só depois, ao usar o botão "Adicionar XMLs" na tela de resultados, é que as notas batem.
 
-Adicionalmente, a tabela `fechamentos_mensais` está vazia no banco neste momento — então mesmo na versão nova nenhum usuário veria fechamentos até que algum seja salvo de novo.
+## Causa
 
-A política de RLS de leitura (`USING true`) e o código de `listarFechamentos()` já permitem que qualquer usuário autenticado enxergue todos os fechamentos — não há bug de visibilidade entre usuários.
+Em `src/lib/confronto-engine.ts` (função `runConfronto`), o cruzamento por nNF + CNPJ usa a chave `${nNF}_${cleanCnpj(cnpjEmitente)}`. Porém:
 
-## Ações propostas
+- O **CNPJ do XML** (`cnpjEmitente`) é salvo **sem máscara** (vem direto do XML, 14 dígitos puros).
+- O **CNPJ da planilha** vem formatado (ex: `12.345.678/0001-90`) e a função `cleanCnpj` é aplicada apenas no lado da planilha — mas no XML a string pode também ter caracteres não-numéricos dependendo da fonte. Mais importante: a chave usada para o XML em `xmlByNnfCnpj.set` **não passa por `cleanCnpj`** com a mesma normalização que `salvarXmls` faz quando persiste.
 
-1. **Republicar o app** para que a URL publicada passe a servir as últimas mudanças (correções de CT-e/CFOP frete, exclusão, atualização de análise).
-   - Após publicar, pedir ao Leonardo para dar um **hard refresh** (Ctrl+Shift+R / Cmd+Shift+R) para descartar cache do navegador.
+Resultado: na primeira execução (XMLs em memória, recém-parseados), o cruzamento direto frequentemente falha. Quando você reabre via "Adicionar XMLs", o caminho usado é `reconcileMissing`, que tem **4 estratégias de fallback** (chNFe → nNF+CNPJ → nNF único → CNPJ+valor), por isso funciona.
 
-2. **Adicionar um cache-buster leve no header da página de Fechamentos**: ao montar a página, forçar `listarFechamentos` a rodar sempre (já roda no `useEffect`) e exibir um indicador "Atualizado em HH:MM" + botão "Recarregar" para o usuário poder forçar refresh manualmente sem confiar em cache.
+## Solução
 
-3. **Validação rápida pós-publicação**: pedir ao Antônio para salvar um fechamento de teste e ao Leonardo para abrir `/fechamentos` — confirmar que aparece para ambos.
+Tornar `runConfronto` consistente com `reconcileMissing`:
 
-## Não vou alterar
+1. **Normalizar CNPJ dos dois lados** ao construir o mapa `xmlByNnfCnpj` (aplicar `cleanCnpj` no CNPJ do XML também).
+2. **Adicionar os mesmos fallbacks** que `reconcileMissing` já usa:
+   - Match por `nNF` apenas, quando único no conjunto.
+   - Match por `CNPJ + valor aproximado` quando a planilha não tem `nNF`.
+3. Garantir que o lookup por `chNFe` continue prioritário.
 
-- RLS de `fechamentos_mensais` (já está correta para o caso de uso multi-usuário da empresa).
-- Lógica de `listarFechamentos` (já busca todos sem filtro de usuário).
+## Arquivos alterados
 
-## Observação
+- `src/lib/confronto-engine.ts` — refatorar `runConfronto` para usar a mesma lógica em camadas de `reconcileMissing` (chave normalizada + fallbacks).
 
-Se após publicar e dar hard refresh o Leonardo ainda não ver fechamentos que o Antônio salvou, abro a aba Network no navegador dele para confirmar a resposta da chamada `GET /rest/v1/fechamentos_mensais` — mas com a configuração atual isso seria inesperado.
+Nenhuma mudança de UI, banco ou contratos. Comportamento esperado depois: o confronto já cruza certo na primeira tentativa, sem precisar reanexar.

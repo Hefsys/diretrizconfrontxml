@@ -137,37 +137,64 @@ export function runConfronto(
   xmlData: XmlNfeData[]
 ): { results: ConfrontoResult[]; summary: ConfrontoSummary } {
   const results: ConfrontoResult[] = [];
-  const matchedXmlKeys = new Set<string>();
+  const usedXmlIdx = new Set<number>();
 
-  // Build XML lookup maps
-  const xmlByChave = new Map<string, XmlNfeData>();
-  const xmlByNnfCnpj = new Map<string, XmlNfeData>();
+  // Build XML lookup structures (CNPJ sempre normalizado nos dois lados)
+  const xmlByChave = new Map<string, number>();
+  const xmlByNnfCnpj = new Map<string, number>();
+  const nnfCounts = new Map<string, number>();
 
-  for (const xml of xmlData) {
+  for (let i = 0; i < xmlData.length; i++) {
+    const xml = xmlData[i];
     if (xml.chNFe && xml.chNFe.length === 44) {
-      xmlByChave.set(xml.chNFe, xml);
+      xmlByChave.set(xml.chNFe, i);
     }
-    const key = `${xml.nNF}_${cleanCnpj(xml.cnpjEmitente)}`;
-    xmlByNnfCnpj.set(key, xml);
+    if (xml.nNF) {
+      const key = `${xml.nNF}_${cleanCnpj(xml.cnpjEmitente ?? '')}`;
+      if (!xmlByNnfCnpj.has(key)) xmlByNnfCnpj.set(key, i);
+      nnfCounts.set(xml.nNF, (nnfCounts.get(xml.nNF) ?? 0) + 1);
+    }
   }
 
   // Process each Excel row
   for (const row of excelData) {
-    let matchedXml: XmlNfeData | undefined;
+    let matchedIdx = -1;
 
-    // Primary: match by chNFe
+    // 1) Match por chNFe
     if (row.chNFe && row.chNFe.length === 44) {
-      matchedXml = xmlByChave.get(row.chNFe);
+      const idx = xmlByChave.get(row.chNFe);
+      if (idx !== undefined && !usedXmlIdx.has(idx)) matchedIdx = idx;
     }
 
-    // Fallback: match by nNF + CNPJ
-    if (!matchedXml && row.nNF && row.cnpjEmitente) {
+    // 2) Match por nNF + CNPJ
+    if (matchedIdx === -1 && row.nNF && row.cnpjEmitente) {
       const key = `${row.nNF}_${cleanCnpj(row.cnpjEmitente)}`;
-      matchedXml = xmlByNnfCnpj.get(key);
+      const idx = xmlByNnfCnpj.get(key);
+      if (idx !== undefined && !usedXmlIdx.has(idx)) matchedIdx = idx;
     }
+
+    // 3) Fallback: nNF apenas (somente se único)
+    if (matchedIdx === -1 && row.nNF && (nnfCounts.get(row.nNF) ?? 0) === 1) {
+      matchedIdx = xmlData.findIndex(
+        (xml, idx) => !usedXmlIdx.has(idx) && xml.nNF === row.nNF
+      );
+    }
+
+    // 4) Fallback: CNPJ + valor aproximado (linhas sem nNF)
+    if (matchedIdx === -1 && (!row.nNF || row.nNF === '0') && row.cnpjEmitente && row.valorContabil != null) {
+      const cnpjRow = cleanCnpj(row.cnpjEmitente);
+      matchedIdx = xmlData.findIndex(
+        (xml, idx) =>
+          !usedXmlIdx.has(idx) &&
+          cleanCnpj(xml.cnpjEmitente ?? '') === cnpjRow &&
+          Math.abs(xml.vNF - row.valorContabil) <= 0.01
+      );
+    }
+
+    const matchedXml = matchedIdx >= 0 ? xmlData[matchedIdx] : undefined;
 
     if (matchedXml) {
-      matchedXmlKeys.add(matchedXml.chNFe || `${matchedXml.nNF}_${cleanCnpj(matchedXml.cnpjEmitente)}`);
+      usedXmlIdx.add(matchedIdx);
       // Coluna Valor Contábil da planilha RFS008 já é o Valor Total da NF (com IPI/ST embutidos).
       // Comparação é sempre direta — nunca somar colunas extras.
       const valorPlanilha = row.valorContabil;
