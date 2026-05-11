@@ -1,5 +1,8 @@
 import type { XmlNfeData, ExcelNfeData, ConfrontoResult, ConfrontoSummary } from './types';
-import { CFOPS_FRETE_IGNORADOS } from './excel-parser';
+import { CFOPS_FRETE_IGNORADOS, CFOPS_AJUSTE_ZERADO } from './excel-parser';
+
+const isAjusteZerado = (cfop?: string, valor?: number | null) =>
+  !!cfop && CFOPS_AJUSTE_ZERADO.has(cfop) && (valor ?? 0) === 0;
 
 function cleanCnpj(v: string): string {
   return String(v ?? '').replace(/[.\-\/\s]/g, '');
@@ -219,7 +222,8 @@ export function runConfronto(
       });
     } else {
       const cpf = isCpf(row.cnpjEmitente);
-      const autoOk = row.isFrete || cpf;
+      const ajuste = isAjusteZerado(row.cfop, row.valorContabil);
+      const autoOk = row.isFrete || cpf || ajuste;
       const valorPlanilha = row.valorContabil;
       results.push({
         status: autoOk ? 'ok' : 'ausente_xml',
@@ -227,7 +231,7 @@ export function runConfronto(
         serie: row.serie,
         data: row.dataDocumento || row.dataEntrada,
         cnpjEmitente: row.cnpjEmitente,
-        nomeEmitente: row.nomeEmitente || (row.isFrete ? 'CT-e (Frete)' : (cpf ? 'Pessoa Física (CPF)' : '')),
+        nomeEmitente: row.nomeEmitente || (row.isFrete ? 'CT-e (Frete)' : (ajuste ? 'Ajuste/Estorno (CFOP 2949)' : (cpf ? 'Pessoa Física (CPF)' : ''))),
         valorPlanilha,
         valorXml: autoOk ? valorPlanilha : null,
         diferenca: autoOk ? 0 : null,
@@ -284,16 +288,18 @@ export function sanitizeLegacyResults(
     if (r.status !== 'ausente_xml') return r;
     const cpf = isCpf(r.cnpjEmitente);
     const cfopFrete = !!(r.cfop && CFOPS_FRETE_IGNORADOS.has(r.cfop));
+    const ajuste = isAjusteZerado(r.cfop, r.valorPlanilha);
     const nome = normalizeName(r.nomeEmitente);
     const nomeFrete = FRETE_NAME_RE.test(nome);
     const nomeSeguro = SEGURO_NAME_RE.test(nome);
-    if (!cpf && !cfopFrete && !r.isFrete && !nomeFrete && !nomeSeguro) return r;
+    if (!cpf && !cfopFrete && !r.isFrete && !nomeFrete && !nomeSeguro && !ajuste) return r;
     changed++;
     const valor = r.valorPlanilha ?? 0;
     let label = r.nomeEmitente;
     if (!label) {
       if (cfopFrete || r.isFrete || nomeFrete) label = 'CT-e (Frete)';
       else if (nomeSeguro) label = 'Apólice de Seguro';
+      else if (ajuste) label = 'Ajuste/Estorno (CFOP 2949)';
       else label = 'Pessoa Física (CPF)';
     }
     return {
