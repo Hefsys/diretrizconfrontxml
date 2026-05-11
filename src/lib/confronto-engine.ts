@@ -259,3 +259,31 @@ export function runConfronto(
 
   return { results, summary: recomputeSummary(results) };
 }
+
+/**
+ * Sanitiza resultados antigos (fechamentos salvos antes das regras de CPF/Frete):
+ * - Linhas `ausente_xml` com CPF (11 dígitos) viram `ok`.
+ * - Linhas `ausente_xml` com `isFrete` ou `cfop` em CFOPS_FRETE_IGNORADOS viram `ok`.
+ * Retorna { results, summary, changed } — `changed` indica se algo foi reclassificado.
+ */
+export function sanitizeLegacyResults(
+  input: ConfrontoResult[]
+): { results: ConfrontoResult[]; summary: ConfrontoSummary; changed: number } {
+  let changed = 0;
+  const results = input.map((r) => {
+    if (r.status !== 'ausente_xml') return r;
+    const cpf = isCpf(r.cnpjEmitente);
+    const cfopFrete = !!(r.cfop && CFOPS_FRETE_IGNORADOS.has(r.cfop));
+    if (!cpf && !cfopFrete && !r.isFrete) return r;
+    changed++;
+    const valor = r.valorPlanilha ?? 0;
+    return {
+      ...r,
+      status: 'ok' as const,
+      nomeEmitente: r.nomeEmitente || (cfopFrete || r.isFrete ? 'CT-e (Frete)' : 'Pessoa Física (CPF)'),
+      valorXml: valor,
+      diferenca: 0,
+    };
+  });
+  return { results, summary: recomputeSummary(results), changed };
+}
