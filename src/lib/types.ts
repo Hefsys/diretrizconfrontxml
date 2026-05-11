@@ -32,6 +32,7 @@ export interface ExcelNfeData {
   rowIndex: number;
   sheetName: string;
   isFrete?: boolean;
+  cfop?: string;
 }
 
 export interface Empresa {
