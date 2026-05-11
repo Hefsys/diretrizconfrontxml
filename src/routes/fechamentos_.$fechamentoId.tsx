@@ -152,6 +152,35 @@ function FechamentoDetailPage() {
           </div>
         </div>
 
+        {pendingFix && pendingFix.changed > 0 && (
+          <div className="mx-auto max-w-7xl rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 flex items-center justify-between gap-3">
+            <span>
+              {pendingFix.changed} linha(s) reclassificada(s) automaticamente como <strong>OK</strong> (CPF de pessoa física ou CT-e/Frete). As alterações estão sendo exibidas, mas ainda não foram salvas no banco.
+            </span>
+            <Button
+              size="sm"
+              disabled={savingFix}
+              onClick={async () => {
+                setSavingFix(true);
+                const res = await atualizarFechamento({
+                  id: fechamento.id,
+                  resumo: pendingFix.summary,
+                  resultados: pendingFix.results,
+                });
+                setSavingFix(false);
+                if (!res.ok) {
+                  toast.error('Falha ao salvar correções', { description: res.error });
+                  return;
+                }
+                setPendingFix(null);
+                toast.success('Correções salvas');
+              }}
+            >
+              {savingFix ? 'Salvando…' : 'Salvar correções'}
+            </Button>
+          </div>
+        )}
+
         <ResultsSection
           results={fechamento.resultados}
           summary={fechamento.resumo}
