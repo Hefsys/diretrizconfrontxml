@@ -266,6 +266,16 @@ export function runConfronto(
  * - Linhas `ausente_xml` com `isFrete` ou `cfop` em CFOPS_FRETE_IGNORADOS viram `ok`.
  * Retorna { results, summary, changed } — `changed` indica se algo foi reclassificado.
  */
+function normalizeName(s: string | null | undefined): string {
+  return String(s ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+const FRETE_NAME_RE = /\b(transporte|transportes|transportadora|logistica|cargo|cargas|frete)\b/;
+const SEGURO_NAME_RE = /\b(seguros|seguradora|seguro)\b/;
+
 export function sanitizeLegacyResults(
   input: ConfrontoResult[]
 ): { results: ConfrontoResult[]; summary: ConfrontoSummary; changed: number } {
@@ -274,13 +284,22 @@ export function sanitizeLegacyResults(
     if (r.status !== 'ausente_xml') return r;
     const cpf = isCpf(r.cnpjEmitente);
     const cfopFrete = !!(r.cfop && CFOPS_FRETE_IGNORADOS.has(r.cfop));
-    if (!cpf && !cfopFrete && !r.isFrete) return r;
+    const nome = normalizeName(r.nomeEmitente);
+    const nomeFrete = FRETE_NAME_RE.test(nome);
+    const nomeSeguro = SEGURO_NAME_RE.test(nome);
+    if (!cpf && !cfopFrete && !r.isFrete && !nomeFrete && !nomeSeguro) return r;
     changed++;
     const valor = r.valorPlanilha ?? 0;
+    let label = r.nomeEmitente;
+    if (!label) {
+      if (cfopFrete || r.isFrete || nomeFrete) label = 'CT-e (Frete)';
+      else if (nomeSeguro) label = 'Apólice de Seguro';
+      else label = 'Pessoa Física (CPF)';
+    }
     return {
       ...r,
       status: 'ok' as const,
-      nomeEmitente: r.nomeEmitente || (cfopFrete || r.isFrete ? 'CT-e (Frete)' : 'Pessoa Física (CPF)'),
+      nomeEmitente: label,
       valorXml: valor,
       diferenca: 0,
     };
