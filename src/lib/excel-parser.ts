@@ -154,8 +154,9 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
 
     // CTe (frete) — não há NF-e correspondente; marcar para entrar como OK
     let isFrete = false;
+    let cfopRaw = '';
     if (colMap.cfop >= 0) {
-      const cfopRaw = String(row[colMap.cfop] ?? '').replace(/\D/g, '');
+      cfopRaw = String(row[colMap.cfop] ?? '').replace(/\D/g, '');
       if (cfopRaw && CFOPS_FRETE_IGNORADOS.has(cfopRaw)) isFrete = true;
     }
 
@@ -183,6 +184,7 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
       rowIndex: i,
       sheetName,
       isFrete,
+      cfop: cfopRaw || undefined,
     });
   }
 
