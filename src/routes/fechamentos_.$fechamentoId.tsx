@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { ResultsSection } from '@/components/ResultsSection';
 import { atualizarFechamento } from '@/lib/fechamentos';
+import { sanitizeLegacyResults } from '@/lib/confronto-engine';
 import type { ConfrontoResult, ConfrontoSummary, FechamentoMensal } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { LogOut, ArrowLeft } from 'lucide-react';
