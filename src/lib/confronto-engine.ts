@@ -222,7 +222,8 @@ export function runConfronto(
       });
     } else {
       const cpf = isCpf(row.cnpjEmitente);
-      const autoOk = row.isFrete || cpf;
+      const ajuste = isAjusteZerado(row.cfop, row.valorContabil);
+      const autoOk = row.isFrete || cpf || ajuste;
       const valorPlanilha = row.valorContabil;
       results.push({
         status: autoOk ? 'ok' : 'ausente_xml',
@@ -230,7 +231,7 @@ export function runConfronto(
         serie: row.serie,
         data: row.dataDocumento || row.dataEntrada,
         cnpjEmitente: row.cnpjEmitente,
-        nomeEmitente: row.nomeEmitente || (row.isFrete ? 'CT-e (Frete)' : (cpf ? 'Pessoa Física (CPF)' : '')),
+        nomeEmitente: row.nomeEmitente || (row.isFrete ? 'CT-e (Frete)' : (ajuste ? 'Ajuste/Estorno (CFOP 2949)' : (cpf ? 'Pessoa Física (CPF)' : ''))),
         valorPlanilha,
         valorXml: autoOk ? valorPlanilha : null,
         diferenca: autoOk ? 0 : null,
