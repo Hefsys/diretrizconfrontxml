@@ -76,6 +76,8 @@ export interface ConfrontoResult {
   diferenca: number | null;
   chNFe: string;
   sheetName?: string;
+  cfop?: string;
+  isFrete?: boolean;
 }
 
 export interface ConfrontoSummary {
