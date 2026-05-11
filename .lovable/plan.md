@@ -1,47 +1,52 @@
-## Diagnóstico
+## Objetivo
 
-Verifiquei o fechamento aberto (`e44d246f…`). Os **193 ausentes** se distribuem assim:
+Desconsiderar de "ausentes" as notas com **CFOP 2949** que tenham **valor contábil zerado**, tratando-as automaticamente como **OK** (linhas de ajuste/entrada sem valor financeiro, sem NF-e correspondente esperada).
 
-| Emitente | Qtd | Tipo real |
-|---|---|---|
-| FERNANDO G. DE BARROS TRANSPORTES | 66 | CT-e (frete) |
-| VOLKSWAGEN DO BRASIL LTDA | 55 | NF-e real (XML faltando ou não importado) |
-| VALE RIO TRANSPORTE RODOVIÁRIO | 30 | CT-e |
-| ALMEIDA TRANSPORTE E LOGÍSTICA | 21 | CT-e |
-| TRANSPORTES NACIONAL / EXATA / NACIONAL / PROGRESSO / LSLOG | 17 | CT-e |
-| YLM SEGUROS / ZURICH SEGUROS | 2 | Apólice (sem NF-e) |
-| DISNOVE DISTRIBUIDORA | 1 | NF-e real |
+## Regra
 
-Ou seja: **~135 são CT-e/seguros** (deveriam estar OK) e **~56 são NF-e reais** (Volkswagen + Disnove) que realmente estão sem XML correspondente.
+Uma linha é auto-OK quando:
+- `cfop === '2949'` **E**
+- `valorContabil === 0` (ou ausente)
 
-**Por que o sanitizador automático não pegou os 135**: este fechamento foi salvo **antes** da alteração que persiste `cfop` e `isFrete` em cada linha. Como o JSON salvo não tem esses campos, o `sanitizeLegacyResults` atual só consegue reclassificar quando o CNPJ é CPF (11 dígitos) — e nenhum aqui é.
+Permanece a regra atual para CPF, `isFrete` e CFOPs de frete.
 
-Resposta direta: **não, 193 não está correto** — o número real esperado fica em torno de 56 (apenas Volkswagen + Disnove).
+## Mudanças
 
-## Plano
+### 1. `src/lib/excel-parser.ts`
+- Criar nova constante exportada:
+  ```ts
+  export const CFOPS_AJUSTE_ZERADO = new Set<string>(['2949', '1949']);
+  ```
+  (incluo `1949` — entrada equivalente — para cobertura simétrica; se não quiser, removo)
 
-### 1. Heurística por nome para fechamentos legados
+### 2. `src/lib/confronto-engine.ts`
+- Importar `CFOPS_AJUSTE_ZERADO`.
+- Helper:
+  ```ts
+  const isAjusteZerado = (cfop?: string, valor?: number | null) =>
+    !!cfop && CFOPS_AJUSTE_ZERADO.has(cfop) && (valor ?? 0) === 0;
+  ```
+- Em `runConfronto` (bloco do `else` quando não há XML), incluir no `autoOk`:
+  ```ts
+  const ajuste = isAjusteZerado(row.cfop, row.valorContabil);
+  const autoOk = row.isFrete || cpf || ajuste;
+  ```
+  Rótulo quando `ajuste`: `'Ajuste/Estorno (CFOP 2949)'`.
+- Em `sanitizeLegacyResults`, adicionar a mesma checagem para reclassificar fechamentos antigos:
+  ```ts
+  const ajuste = isAjusteZerado(r.cfop, r.valorPlanilha);
+  if (!cpf && !cfopFrete && !r.isFrete && !nomeFrete && !nomeSeguro && !ajuste) return r;
+  ```
+  Rótulo: `'Ajuste/Estorno (CFOP 2949)'`.
 
-Em `src/lib/confronto-engine.ts → sanitizeLegacyResults`, adicionar fallback por nome do emitente quando `cfop`/`isFrete` não existem no resultado salvo:
+### 3. Sem mudanças em UI
+A reclassificação aparece pelo banner amarelo "Salvar correções" já existente.
 
-- Reclassificar como **OK** quando `nomeEmitente` contém (case-insensitive, sem acento) qualquer um de:
-  - `transporte`, `transportes`, `transportadora`, `logistica`, `cargo`, `frete` → marcado como `CT-e (Frete)`
-  - `seguros`, `seguradora` → marcado como `Apólice de Seguro`
+## Resultado esperado
 
-Manter as regras atuais (CPF, `isFrete`, `cfop` em `CFOPS_FRETE_IGNORADOS`) — a heurística de nome é um fallback adicional só para linhas legadas sem `cfop`.
+- Novas análises: linhas com CFOP 2949 e valor 0 entram como **OK**.
+- Fechamentos antigos: ao abrir, banner mostra reclassificações adicionais; "Salvar correções" persiste.
 
-### 2. Banner de correções (já existente)
+## Observação
 
-O banner amarelo "Salvar correções" existente em `fechamentos_.$fechamentoId.tsx` continuará funcionando — ao abrir este fechamento, mostrará "~135 linha(s) reclassificada(s)" e o usuário decide se grava no banco.
-
-### 3. Sem mudanças em novos fechamentos
-
-Análises feitas após a alteração anterior já persistem `cfop`/`isFrete` corretamente, então este fallback só afetará dados antigos.
-
-## Arquivos a alterar
-
-- `src/lib/confronto-engine.ts` — adicionar regex de nome dentro de `sanitizeLegacyResults`.
-
-## O que continuará ausente após o fix
-
-As ~56 linhas de **Volkswagen do Brasil** e **Disnove**: estas são NF-e reais e o XML não foi encontrado. Caberá ao usuário importar os XMLs faltantes (a tela de XMLs / upload já trata isso) — não é caso de reclassificação automática.
+Se o valor **não** for zero, a linha CFOP 2949 continua sendo tratada normalmente (pode virar `ausente_xml` se não houver XML). Confirmar se essa é a intenção, ou se qualquer 2949 (independente do valor) deve ser ignorado.

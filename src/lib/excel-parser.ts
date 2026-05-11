@@ -19,6 +19,9 @@ export const CFOPS_FRETE_IGNORADOS = new Set<string>([
   '1932', '2932',
 ]);
 
+// CFOPs de ajuste/estorno — quando valor contábil é zero, ignorar de "ausentes"
+export const CFOPS_AJUSTE_ZERADO = new Set<string>(['2949', '1949']);
+
 function normalizeStr(s: string): string {
   return s
     .toLowerCase()
