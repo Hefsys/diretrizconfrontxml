@@ -1,5 +1,8 @@
 import type { XmlNfeData, ExcelNfeData, ConfrontoResult, ConfrontoSummary } from './types';
-import { CFOPS_FRETE_IGNORADOS } from './excel-parser';
+import { CFOPS_FRETE_IGNORADOS, CFOPS_AJUSTE_ZERADO } from './excel-parser';
+
+const isAjusteZerado = (cfop?: string, valor?: number | null) =>
+  !!cfop && CFOPS_AJUSTE_ZERADO.has(cfop) && (valor ?? 0) === 0;
 
 function cleanCnpj(v: string): string {
   return String(v ?? '').replace(/[.\-\/\s]/g, '');
