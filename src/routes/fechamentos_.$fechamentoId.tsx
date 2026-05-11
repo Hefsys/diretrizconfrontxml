@@ -74,7 +74,13 @@ function FechamentoDetailPage() {
           return;
         }
         const f = data as unknown as FechamentoMensal;
-        setFechamento(f);
+        const sane = sanitizeLegacyResults(f.resultados);
+        if (sane.changed > 0) {
+          setFechamento({ ...f, resultados: sane.results, resumo: sane.summary });
+          setPendingFix(sane);
+        } else {
+          setFechamento(f);
+        }
         setCanUpdateFechamento(true);
         const { data: emp } = await supabase
           .from('empresas')
