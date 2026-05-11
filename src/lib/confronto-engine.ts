@@ -1,7 +1,12 @@
 import type { XmlNfeData, ExcelNfeData, ConfrontoResult, ConfrontoSummary } from './types';
+import { CFOPS_FRETE_IGNORADOS } from './excel-parser';
 
 function cleanCnpj(v: string): string {
-  return v.replace(/[.\-\/\s]/g, '');
+  return String(v ?? '').replace(/[.\-\/\s]/g, '');
+}
+
+function isCpf(v: string | null | undefined): boolean {
+  return cleanCnpj(v ?? '').length === 11;
 }
 
 export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
