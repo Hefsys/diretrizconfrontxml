@@ -1,7 +1,12 @@
 import type { XmlNfeData, ExcelNfeData, ConfrontoResult, ConfrontoSummary } from './types';
+import { CFOPS_FRETE_IGNORADOS } from './excel-parser';
 
 function cleanCnpj(v: string): string {
-  return v.replace(/[.\-\/\s]/g, '');
+  return String(v ?? '').replace(/[.\-\/\s]/g, '');
+}
+
+function isCpf(v: string | null | undefined): boolean {
+  return cleanCnpj(v ?? '').length === 11;
 }
 
 export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
@@ -195,8 +200,6 @@ export function runConfronto(
 
     if (matchedXml) {
       usedXmlIdx.add(matchedIdx);
-      // Coluna Valor Contábil da planilha RFS008 já é o Valor Total da NF (com IPI/ST embutidos).
-      // Comparação é sempre direta — nunca somar colunas extras.
       const valorPlanilha = row.valorContabil;
       const diff = Math.abs(valorPlanilha - matchedXml.vNF);
       results.push({
@@ -211,20 +214,27 @@ export function runConfronto(
         diferenca: matchedXml.cancelada ? null : (diff > 0.01 ? valorPlanilha - matchedXml.vNF : 0),
         chNFe: matchedXml.chNFe,
         sheetName: row.sheetName,
+        cfop: row.cfop,
+        isFrete: row.isFrete,
       });
     } else {
+      const cpf = isCpf(row.cnpjEmitente);
+      const autoOk = row.isFrete || cpf;
+      const valorPlanilha = row.valorContabil;
       results.push({
-        status: row.isFrete ? 'ok' : 'ausente_xml',
+        status: autoOk ? 'ok' : 'ausente_xml',
         nNF: row.nNF,
         serie: row.serie,
         data: row.dataDocumento || row.dataEntrada,
         cnpjEmitente: row.cnpjEmitente,
-        nomeEmitente: row.nomeEmitente || (row.isFrete ? 'CT-e (Frete)' : ''),
-        valorPlanilha: row.valorContabil,
-        valorXml: null,
-        diferenca: null,
+        nomeEmitente: row.nomeEmitente || (row.isFrete ? 'CT-e (Frete)' : (cpf ? 'Pessoa Física (CPF)' : '')),
+        valorPlanilha,
+        valorXml: autoOk ? valorPlanilha : null,
+        diferenca: autoOk ? 0 : null,
         chNFe: row.chNFe,
         sheetName: row.sheetName,
+        cfop: row.cfop,
+        isFrete: row.isFrete,
       });
     }
   }
@@ -248,4 +258,32 @@ export function runConfronto(
   }
 
   return { results, summary: recomputeSummary(results) };
+}
+
+/**
+ * Sanitiza resultados antigos (fechamentos salvos antes das regras de CPF/Frete):
+ * - Linhas `ausente_xml` com CPF (11 dígitos) viram `ok`.
+ * - Linhas `ausente_xml` com `isFrete` ou `cfop` em CFOPS_FRETE_IGNORADOS viram `ok`.
+ * Retorna { results, summary, changed } — `changed` indica se algo foi reclassificado.
+ */
+export function sanitizeLegacyResults(
+  input: ConfrontoResult[]
+): { results: ConfrontoResult[]; summary: ConfrontoSummary; changed: number } {
+  let changed = 0;
+  const results = input.map((r) => {
+    if (r.status !== 'ausente_xml') return r;
+    const cpf = isCpf(r.cnpjEmitente);
+    const cfopFrete = !!(r.cfop && CFOPS_FRETE_IGNORADOS.has(r.cfop));
+    if (!cpf && !cfopFrete && !r.isFrete) return r;
+    changed++;
+    const valor = r.valorPlanilha ?? 0;
+    return {
+      ...r,
+      status: 'ok' as const,
+      nomeEmitente: r.nomeEmitente || (cfopFrete || r.isFrete ? 'CT-e (Frete)' : 'Pessoa Física (CPF)'),
+      valorXml: valor,
+      diferenca: 0,
+    };
+  });
+  return { results, summary: recomputeSummary(results), changed };
 }

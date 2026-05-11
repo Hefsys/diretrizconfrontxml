@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { ResultsSection } from '@/components/ResultsSection';
 import { atualizarFechamento } from '@/lib/fechamentos';
+import { sanitizeLegacyResults } from '@/lib/confronto-engine';
 import type { ConfrontoResult, ConfrontoSummary, FechamentoMensal } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { LogOut, ArrowLeft } from 'lucide-react';
@@ -48,6 +49,8 @@ function FechamentoDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [canUpdateFechamento, setCanUpdateFechamento] = useState(false);
+  const [pendingFix, setPendingFix] = useState<{ results: ConfrontoResult[]; summary: ConfrontoSummary; changed: number } | null>(null);
+  const [savingFix, setSavingFix] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate({ to: '/auth' });
@@ -71,7 +74,13 @@ function FechamentoDetailPage() {
           return;
         }
         const f = data as unknown as FechamentoMensal;
-        setFechamento(f);
+        const sane = sanitizeLegacyResults(f.resultados);
+        if (sane.changed > 0) {
+          setFechamento({ ...f, resultados: sane.results, resumo: sane.summary });
+          setPendingFix(sane);
+        } else {
+          setFechamento(f);
+        }
         setCanUpdateFechamento(true);
         const { data: emp } = await supabase
           .from('empresas')
@@ -142,6 +151,35 @@ function FechamentoDetailPage() {
             <span>Salvo em {new Date(fechamento.fechado_em).toLocaleString('pt-BR')}</span>
           </div>
         </div>
+
+        {pendingFix && pendingFix.changed > 0 && (
+          <div className="mx-auto max-w-7xl rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 flex items-center justify-between gap-3">
+            <span>
+              {pendingFix.changed} linha(s) reclassificada(s) automaticamente como <strong>OK</strong> (CPF de pessoa física ou CT-e/Frete). As alterações estão sendo exibidas, mas ainda não foram salvas no banco.
+            </span>
+            <Button
+              size="sm"
+              disabled={savingFix}
+              onClick={async () => {
+                setSavingFix(true);
+                const res = await atualizarFechamento({
+                  id: fechamento.id,
+                  resumo: pendingFix.summary,
+                  resultados: pendingFix.results,
+                });
+                setSavingFix(false);
+                if (!res.ok) {
+                  toast.error('Falha ao salvar correções', { description: res.error });
+                  return;
+                }
+                setPendingFix(null);
+                toast.success('Correções salvas');
+              }}
+            >
+              {savingFix ? 'Salvando…' : 'Salvar correções'}
+            </Button>
+          </div>
+        )}
 
         <ResultsSection
           results={fechamento.resultados}

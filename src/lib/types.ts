@@ -32,6 +32,7 @@ export interface ExcelNfeData {
   rowIndex: number;
   sheetName: string;
   isFrete?: boolean;
+  cfop?: string;
 }
 
 export interface Empresa {
@@ -75,6 +76,8 @@ export interface ConfrontoResult {
   diferenca: number | null;
   chNFe: string;
   sheetName?: string;
+  cfop?: string;
+  isFrete?: boolean;
 }
 
 export interface ConfrontoSummary {
