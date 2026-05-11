@@ -288,16 +288,18 @@ export function sanitizeLegacyResults(
     if (r.status !== 'ausente_xml') return r;
     const cpf = isCpf(r.cnpjEmitente);
     const cfopFrete = !!(r.cfop && CFOPS_FRETE_IGNORADOS.has(r.cfop));
+    const ajuste = isAjusteZerado(r.cfop, r.valorPlanilha);
     const nome = normalizeName(r.nomeEmitente);
     const nomeFrete = FRETE_NAME_RE.test(nome);
     const nomeSeguro = SEGURO_NAME_RE.test(nome);
-    if (!cpf && !cfopFrete && !r.isFrete && !nomeFrete && !nomeSeguro) return r;
+    if (!cpf && !cfopFrete && !r.isFrete && !nomeFrete && !nomeSeguro && !ajuste) return r;
     changed++;
     const valor = r.valorPlanilha ?? 0;
     let label = r.nomeEmitente;
     if (!label) {
       if (cfopFrete || r.isFrete || nomeFrete) label = 'CT-e (Frete)';
       else if (nomeSeguro) label = 'Apólice de Seguro';
+      else if (ajuste) label = 'Ajuste/Estorno (CFOP 2949)';
       else label = 'Pessoa Física (CPF)';
     }
     return {
