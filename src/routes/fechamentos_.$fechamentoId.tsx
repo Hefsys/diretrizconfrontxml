@@ -49,6 +49,8 @@ function FechamentoDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [canUpdateFechamento, setCanUpdateFechamento] = useState(false);
+  const [pendingFix, setPendingFix] = useState<{ results: ConfrontoResult[]; summary: ConfrontoSummary; changed: number } | null>(null);
+  const [savingFix, setSavingFix] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate({ to: '/auth' });
