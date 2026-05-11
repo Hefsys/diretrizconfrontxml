@@ -200,8 +200,6 @@ export function runConfronto(
 
     if (matchedXml) {
       usedXmlIdx.add(matchedIdx);
-      // Coluna Valor Contábil da planilha RFS008 já é o Valor Total da NF (com IPI/ST embutidos).
-      // Comparação é sempre direta — nunca somar colunas extras.
       const valorPlanilha = row.valorContabil;
       const diff = Math.abs(valorPlanilha - matchedXml.vNF);
       results.push({
@@ -216,20 +214,27 @@ export function runConfronto(
         diferenca: matchedXml.cancelada ? null : (diff > 0.01 ? valorPlanilha - matchedXml.vNF : 0),
         chNFe: matchedXml.chNFe,
         sheetName: row.sheetName,
+        cfop: row.cfop,
+        isFrete: row.isFrete,
       });
     } else {
+      const cpf = isCpf(row.cnpjEmitente);
+      const autoOk = row.isFrete || cpf;
+      const valorPlanilha = row.valorContabil;
       results.push({
-        status: row.isFrete ? 'ok' : 'ausente_xml',
+        status: autoOk ? 'ok' : 'ausente_xml',
         nNF: row.nNF,
         serie: row.serie,
         data: row.dataDocumento || row.dataEntrada,
         cnpjEmitente: row.cnpjEmitente,
-        nomeEmitente: row.nomeEmitente || (row.isFrete ? 'CT-e (Frete)' : ''),
-        valorPlanilha: row.valorContabil,
-        valorXml: null,
-        diferenca: null,
+        nomeEmitente: row.nomeEmitente || (row.isFrete ? 'CT-e (Frete)' : (cpf ? 'Pessoa Física (CPF)' : '')),
+        valorPlanilha,
+        valorXml: autoOk ? valorPlanilha : null,
+        diferenca: autoOk ? 0 : null,
         chNFe: row.chNFe,
         sheetName: row.sheetName,
+        cfop: row.cfop,
+        isFrete: row.isFrete,
       });
     }
   }
