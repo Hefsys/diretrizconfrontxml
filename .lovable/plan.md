@@ -1,59 +1,47 @@
-## Problema
+## Diagnóstico
 
-Na última análise fechada, linhas que deveriam estar como **OK** estão aparecendo como **Ausente no XML**:
+Verifiquei o fechamento aberto (`e44d246f…`). Os **193 ausentes** se distribuem assim:
 
-1. **CT-e (Frete) — CFOPs 1353/2353 (e similares)**: a planilha tem essas linhas, mas não existe NF-e correspondente (é Conhecimento de Transporte, não Nota Fiscal). Devem ficar OK.
-2. **Fornecedores Pessoa Física (CPF, 11 dígitos)**: também não geram NF-e em muitos casos. Devem ficar OK.
+| Emitente | Qtd | Tipo real |
+|---|---|---|
+| FERNANDO G. DE BARROS TRANSPORTES | 66 | CT-e (frete) |
+| VOLKSWAGEN DO BRASIL LTDA | 55 | NF-e real (XML faltando ou não importado) |
+| VALE RIO TRANSPORTE RODOVIÁRIO | 30 | CT-e |
+| ALMEIDA TRANSPORTE E LOGÍSTICA | 21 | CT-e |
+| TRANSPORTES NACIONAL / EXATA / NACIONAL / PROGRESSO / LSLOG | 17 | CT-e |
+| YLM SEGUROS / ZURICH SEGUROS | 2 | Apólice (sem NF-e) |
+| DISNOVE DISTRIBUIDORA | 1 | NF-e real |
 
-Hoje o motor (`runConfronto`) já ignora frete via `isFrete` (CFOPs definidos em `CFOPS_FRETE_IGNORADOS`), mas:
-- A regra de **CPF** não existe — qualquer linha com emitente PF cai como ausente.
-- Para **fechamentos antigos** já salvos no banco, os resultados foram persistidos com `status: 'ausente_xml'` antes da regra de frete entrar; precisamos de um saneamento.
+Ou seja: **~135 são CT-e/seguros** (deveriam estar OK) e **~56 são NF-e reais** (Volkswagen + Disnove) que realmente estão sem XML correspondente.
 
-Além disso, `ConfrontoResult` não guarda o `cfop` da linha, então não dá para reclassificar frete em fechamentos antigos só lendo o JSON salvo. Precisamos passar a persistir o CFOP daqui para frente e fazer um fallback heurístico para o passado.
+**Por que o sanitizador automático não pegou os 135**: este fechamento foi salvo **antes** da alteração que persiste `cfop` e `isFrete` em cada linha. Como o JSON salvo não tem esses campos, o `sanitizeLegacyResults` atual só consegue reclassificar quando o CNPJ é CPF (11 dígitos) — e nenhum aqui é.
 
-## Solução
+Resposta direta: **não, 193 não está correto** — o número real esperado fica em torno de 56 (apenas Volkswagen + Disnove).
 
-### 1. Engine: tratar CPF como OK (sem XML esperado)
+## Plano
 
-Em `src/lib/confronto-engine.ts`, no ramo "sem match", quando `cleanCnpj(row.cnpjEmitente).length === 11`:
-- Status `ok`
-- `nomeEmitente` preservado, ou "Pessoa Física (CPF)" se vazio
-- `valorXml = valorPlanilha`, `diferenca = 0` (para que apareça como reconciliado)
+### 1. Heurística por nome para fechamentos legados
 
-### 2. Persistir `cfop` e `isFrete` no resultado
+Em `src/lib/confronto-engine.ts → sanitizeLegacyResults`, adicionar fallback por nome do emitente quando `cfop`/`isFrete` não existem no resultado salvo:
 
-- Adicionar campos opcionais `cfop?: string` e `isFrete?: boolean` em `ConfrontoResult` (`src/lib/types.ts`).
-- `runConfronto` propaga `row.cfop`/`row.isFrete` para cada resultado (tanto no caminho com match quanto sem match).
-- Adicionar `cfop` em `ExcelNfeData` e populá-lo no `excel-parser.ts` (já lemos a coluna CFOP, basta guardar).
+- Reclassificar como **OK** quando `nomeEmitente` contém (case-insensitive, sem acento) qualquer um de:
+  - `transporte`, `transportes`, `transportadora`, `logistica`, `cargo`, `frete` → marcado como `CT-e (Frete)`
+  - `seguros`, `seguradora` → marcado como `Apólice de Seguro`
 
-### 3. Saneamento ao abrir fechamento (corrige o passado)
+Manter as regras atuais (CPF, `isFrete`, `cfop` em `CFOPS_FRETE_IGNORADOS`) — a heurística de nome é um fallback adicional só para linhas legadas sem `cfop`.
 
-Em `src/routes/fechamentos_.$fechamentoId.tsx`, depois de carregar `fechamento.resultados`, aplicar um `sanitizeLegacyResults` que percorre os resultados e converte para `ok` quando o status atual é `ausente_xml` e:
+### 2. Banner de correções (já existente)
 
-- `cleanCnpj(cnpjEmitente).length === 11` (CPF), **ou**
-- `cfop` presente e em `CFOPS_FRETE_IGNORADOS`, **ou**
-- `isFrete === true`, **ou**
-- (heurística para legado sem CFOP) `nomeEmitente` contém "transport", "logística", "frete", "rodov" — opcional, baixo risco de falso positivo. *Pode ficar de fora se preferir só reprocessar.*
+O banner amarelo "Salvar correções" existente em `fechamentos_.$fechamentoId.tsx` continuará funcionando — ao abrir este fechamento, mostrará "~135 linha(s) reclassificada(s)" e o usuário decide se grava no banco.
 
-Se houver mudança e `onUpdate` estiver disponível (admin/criador), oferecer um botão **"Aplicar correções (CPF/Frete)"** que chama `onUpdate` com o resumo recalculado via `recomputeSummary`. Sem o botão, apenas exibe os ajustes em tela (não persiste).
+### 3. Sem mudanças em novos fechamentos
 
-### 4. UI
+Análises feitas após a alteração anterior já persistem `cfop`/`isFrete` corretamente, então este fallback só afetará dados antigos.
 
-- Em `ResultsSection`, mostrar `cfop` na linha (se existir) — pequeno badge ao lado do nome do emitente para facilitar conferência.
-- Mensagem da `Pessoa Física (CPF)` aparece no campo nome quando vazio.
+## Arquivos a alterar
 
-## Arquivos alterados
+- `src/lib/confronto-engine.ts` — adicionar regex de nome dentro de `sanitizeLegacyResults`.
 
-- `src/lib/types.ts` — adiciona `cfop?: string`, `isFrete?: boolean` em `ExcelNfeData`/`ConfrontoResult`.
-- `src/lib/excel-parser.ts` — popular `cfop` na saída.
-- `src/lib/confronto-engine.ts` — regra CPF (status ok), propagação de `cfop`/`isFrete`, exporta `sanitizeLegacyResults` e `CFOPS_FRETE_IGNORADOS` (ou reutiliza do parser).
-- `src/routes/fechamentos_.$fechamentoId.tsx` — chama `sanitizeLegacyResults` ao carregar; botão opcional para persistir.
-- `src/components/ResultsSection.tsx` — exibir CFOP quando presente.
+## O que continuará ausente após o fix
 
-Sem migração de banco — `resultados` é JSONB livre e os campos novos são opcionais.
-
-## Como o usuário verá
-
-- Abrir o fechamento antigo → ausentes que eram CPF e CT-e viram OK na hora.
-- Botão **"Aplicar correções"** salva o ajuste no banco (visível para Leonardo e demais).
-- Novas análises já saem corretas direto do `runConfronto`.
+As ~56 linhas de **Volkswagen do Brasil** e **Disnove**: estas são NF-e reais e o XML não foi encontrado. Caberá ao usuário importar os XMLs faltantes (a tela de XMLs / upload já trata isso) — não é caso de reclassificação automática.
