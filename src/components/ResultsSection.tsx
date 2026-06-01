@@ -89,13 +89,16 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
   const [searchNf, setSearchNf] = useState('');
   const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
   const [isAddingXmls, setIsAddingXmls] = useState(false);
+  const [isAddingExcel, setIsAddingExcel] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [competenciasFechadas] = useState<Set<string>>(new Set());
   const [isClosing, setIsClosing] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveTitulo, setSaveTitulo] = useState('');
   const [saveCompetencia, setSaveCompetencia] = useState<string>('');
+  const [excelSheetDialog, setExcelSheetDialog] = useState<{ workbook: import('xlsx').WorkBook; sheets: string[]; selected: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
 
   // Months available in the dataset, sorted chronologically with counts
   const monthsAvailable = useMemo(() => {
@@ -272,6 +275,86 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     await processXmlFiles(files);
   };
 
+  const handleAddExcelClick = () => excelInputRef.current?.click();
+
+  const processExcelSheets = async (workbook: import('xlsx').WorkBook, sheets: string[]) => {
+    setIsAddingExcel(true);
+    try {
+      const { parseSheet } = await import('@/lib/excel-parser');
+      const { reconcileExcel } = await import('@/lib/confronto-engine');
+      const { salvarLinhasExcel } = await import('@/lib/excel-storage');
+      const novasLinhas = sheets.flatMap((s) => parseSheet(workbook, s));
+      if (novasLinhas.length === 0) {
+        toast.error('Nenhuma linha encontrada nas abas selecionadas');
+        return;
+      }
+      let salvas = 0;
+      if (empresaId && user) {
+        salvas = await salvarLinhasExcel(empresaId, user.id, novasLinhas);
+      }
+      const monthFilter = selectedMonth === 'todos'
+        ? undefined
+        : (row: ConfrontoResult) => {
+            const k = getMonthKey(row.data);
+            return k === selectedMonth || k === 'sem-data';
+          };
+      const { results: newResults, summary: newSummary, matched, unmatched } = reconcileExcel(
+        results,
+        novasLinhas,
+        monthFilter
+      );
+      setResults(newResults);
+      setSummary(newSummary);
+      if (onUpdate) {
+        try {
+          await onUpdate(newResults, newSummary);
+        } catch (err) {
+          console.error('Erro ao persistir análise atualizada:', err);
+          toast.error('Linhas reconciliadas, mas falha ao salvar atualização');
+        }
+      }
+      const monthLabel = selectedMonth === 'todos' ? '' : `${formatMonthLabel(selectedMonth)}: `;
+      const descParts: string[] = [];
+      if (unmatched > 0) descParts.push(`${unmatched} linha(s) sem correspondência adicionada(s) como "Ausente no XML"`);
+      if (salvas > 0) descParts.push(`${salvas} linha(s) salva(s) na base da empresa`);
+      toast.success(`${monthLabel}${matched} linha(s) reconciliada(s)`, {
+        description: descParts.length > 0 ? descParts.join(' · ') : undefined,
+      });
+    } catch (err) {
+      console.error('Erro ao adicionar Excel:', err);
+      toast.error('Falha ao processar Excel');
+    } finally {
+      setIsAddingExcel(false);
+      if (excelInputRef.current) excelInputRef.current.value = '';
+    }
+  };
+
+  const handleExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const { readWorkbook, getSheetNames, autoDetectSheet } = await import('@/lib/excel-parser');
+      const buffer = await file.arrayBuffer();
+      const wb = readWorkbook(buffer);
+      const names = getSheetNames(wb);
+      if (names.length === 0) {
+        toast.error('Planilha sem abas');
+        return;
+      }
+      if (names.length === 1) {
+        await processExcelSheets(wb, names);
+        return;
+      }
+      const auto = autoDetectSheet(wb);
+      setExcelSheetDialog({ workbook: wb, sheets: names, selected: auto ? [auto] : [names[0]] });
+    } catch (err) {
+      console.error('Erro ao ler Excel:', err);
+      toast.error('Falha ao ler arquivo Excel');
+    } finally {
+      if (excelInputRef.current) excelInputRef.current.value = '';
+    }
+  };
+
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragOver(false);
@@ -329,10 +412,23 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             className="hidden"
             onChange={handleXmlFiles}
           />
+          <input
+            ref={excelInputRef}
+            type="file"
+            accept=".xlsx,.xlsb,.xls"
+            className="hidden"
+            onChange={handleExcelFile}
+          />
           {canEditXmls && (
             <Button variant="outline" onClick={handleAddXmlsClick} disabled={isAddingXmls}>
               {isAddingXmls ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Adicionar XMLs
+            </Button>
+          )}
+          {canEditXmls && (
+            <Button variant="outline" onClick={handleAddExcelClick} disabled={isAddingExcel}>
+              {isAddingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Adicionar Excel
             </Button>
           )}
           {readOnly && (
@@ -632,6 +728,65 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!excelSheetDialog} onOpenChange={(o) => !isAddingExcel && !o && setExcelSheetDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Selecione as abas para processar</DialogTitle>
+            <DialogDescription>
+              Marque as abas da planilha que devem ser importadas e reconciliadas com os XMLs já carregados.
+            </DialogDescription>
+          </DialogHeader>
+          {excelSheetDialog && (
+            <div className="flex flex-wrap gap-2 py-2">
+              {excelSheetDialog.sheets.map((name) => {
+                const active = excelSheetDialog.selected.includes(name);
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() =>
+                      setExcelSheetDialog((d) =>
+                        d
+                          ? {
+                              ...d,
+                              selected: active ? d.selected.filter((s) => s !== name) : [...d.selected, name],
+                            }
+                          : d
+                      )
+                    }
+                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                      active
+                        ? 'border-diretriz-red bg-diretriz-red text-white'
+                        : 'border-border bg-background text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcelSheetDialog(null)} disabled={isAddingExcel}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!excelSheetDialog || excelSheetDialog.selected.length === 0) return;
+                const { workbook, selected } = excelSheetDialog;
+                setExcelSheetDialog(null);
+                await processExcelSheets(workbook, selected);
+              }}
+              disabled={isAddingExcel || !excelSheetDialog || excelSheetDialog.selected.length === 0}
+              className="bg-diretriz-red text-white hover:bg-diretriz-red/90"
+            >
+              {isAddingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Processar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
