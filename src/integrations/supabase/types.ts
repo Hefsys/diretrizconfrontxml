@@ -68,6 +68,75 @@ export type Database = {
         }
         Relationships: []
       }
+      excel_linhas_armazenadas: {
+        Row: {
+          cfop: string | null
+          ch_nfe: string | null
+          cnpj_emitente: string
+          competencia: string | null
+          created_at: string
+          data_documento: string
+          data_entrada: string | null
+          empresa_id: string
+          id: string
+          n_nf: string
+          nome_emitente: string | null
+          row_data: Json
+          serie: string
+          sheet_name: string | null
+          updated_at: string
+          uploaded_by: string | null
+          v_bc: number | null
+          v_icms: number | null
+          v_st: number | null
+          valor_contabil: number | null
+        }
+        Insert: {
+          cfop?: string | null
+          ch_nfe?: string | null
+          cnpj_emitente?: string
+          competencia?: string | null
+          created_at?: string
+          data_documento?: string
+          data_entrada?: string | null
+          empresa_id: string
+          id?: string
+          n_nf: string
+          nome_emitente?: string | null
+          row_data: Json
+          serie?: string
+          sheet_name?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+          v_bc?: number | null
+          v_icms?: number | null
+          v_st?: number | null
+          valor_contabil?: number | null
+        }
+        Update: {
+          cfop?: string | null
+          ch_nfe?: string | null
+          cnpj_emitente?: string
+          competencia?: string | null
+          created_at?: string
+          data_documento?: string
+          data_entrada?: string | null
+          empresa_id?: string
+          id?: string
+          n_nf?: string
+          nome_emitente?: string | null
+          row_data?: Json
+          serie?: string
+          sheet_name?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+          v_bc?: number | null
+          v_icms?: number | null
+          v_st?: number | null
+          valor_contabil?: number | null
+        }
+        Relationships: []
+      }
       fechamentos_mensais: {
         Row: {
           competencia: string

@@ -48,43 +48,57 @@ function Index() {
     }
   }, [authLoading, user, navigate]);
 
-  const handleProcess = useCallback(async (xmlFiles: File[], workbook: WorkBook, selectedSheets: string[], empId: string) => {
+  const handleProcess = useCallback(async (xmlFiles: File[], workbook: WorkBook | null, selectedSheets: string[], empId: string) => {
     setIsProcessing(true);
     try {
       const { parseXmlFiles } = await import('@/lib/xml-parser');
       const { parseSheet } = await import('@/lib/excel-parser');
       const { runConfronto } = await import('@/lib/confronto-engine');
       const { salvarXmls, carregarXmlsDaEmpresa, mesclarXmls } = await import('@/lib/xml-storage');
+      const { salvarLinhasExcel, carregarLinhasDaEmpresa, mesclarLinhas } = await import('@/lib/excel-storage');
 
       // 1. Parse uploaded XMLs
       const novosXmls = await parseXmlFiles(xmlFiles);
 
       // 2. Save new XMLs to the company's database
-      let salvos = 0;
+      let xmlsSalvos = 0;
       if (novosXmls.length > 0 && user) {
-        salvos = await salvarXmls(empId, user.id, novosXmls);
+        xmlsSalvos = await salvarXmls(empId, user.id, novosXmls);
       }
 
       // 3. Load all stored XMLs for this company and merge
       const historicoXmls = await carregarXmlsDaEmpresa(empId);
       const todosXmls = mesclarXmls(novosXmls, historicoXmls);
 
-      // 4. Parse Excel and run confronto — Valor Contábil da planilha já é o Valor Total da NF
-      const allExcelData = selectedSheets.flatMap((sheet) => parseSheet(workbook, sheet));
-      const { results: r, summary: s } = runConfronto(allExcelData, todosXmls);
+      // 4. Parse Excel (se enviado), salvar novas linhas e mesclar com base histórica
+      const novasLinhas = workbook
+        ? selectedSheets.flatMap((sheet) => parseSheet(workbook, sheet))
+        : [];
+      let linhasSalvas = 0;
+      if (novasLinhas.length > 0 && user) {
+        linhasSalvas = await salvarLinhasExcel(empId, user.id, novasLinhas);
+      }
+      const historicoLinhas = await carregarLinhasDaEmpresa(empId);
+      const todasLinhas = mesclarLinhas(novasLinhas, historicoLinhas);
+
+      if (todasLinhas.length === 0) {
+        toast.error('Nenhuma linha de planilha disponível para esta empresa. Envie um Excel.');
+        return;
+      }
+
+      const { results: r, summary: s } = runConfronto(todasLinhas, todosXmls);
 
       setEmpresaId(empId);
       setResults(r);
       setSummary(s);
       setView('results');
 
-      if (novosXmls.length > 0) {
-        toast.success(
-          `${salvos} novo(s) XML salvo(s) na base · ${historicoXmls.length} XML(s) histórico(s) considerados`
-        );
-      } else if (historicoXmls.length > 0) {
-        toast.info(`${historicoXmls.length} XML(s) da base histórica considerados`);
-      }
+      const partes: string[] = [];
+      if (novosXmls.length > 0) partes.push(`${xmlsSalvos} novo(s) XML salvo(s)`);
+      if (novasLinhas.length > 0) partes.push(`${linhasSalvas} nova(s) linha(s) Excel salva(s)`);
+      if (historicoXmls.length > 0) partes.push(`${historicoXmls.length} XML(s) histórico(s)`);
+      if (historicoLinhas.length > 0) partes.push(`${historicoLinhas.length} linha(s) Excel histórica(s)`);
+      if (partes.length > 0) toast.success(partes.join(' · '));
     } catch (err) {
       console.error('Processing error:', err);
       toast.error('Erro ao processar confronto');
