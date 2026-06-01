@@ -14,7 +14,7 @@ interface EmpresaOpt {
 }
 
 interface UploadSectionProps {
-  onProcess: (xmlFiles: File[], workbook: WorkBook, selectedSheets: string[], empresaId: string) => void;
+  onProcess: (xmlFiles: File[], workbook: WorkBook | null, selectedSheets: string[], empresaId: string) => void;
   isProcessing: boolean;
 }
 
@@ -71,7 +71,7 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
     );
   };
 
-  const canProcess = !!empresaId && workbook && selectedSheets.length > 0;
+  const canProcess = !!empresaId && (!workbook || selectedSheets.length > 0);
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -189,7 +189,7 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-diretriz-dark/10 text-sm font-bold text-diretriz-dark">
                 XLS
               </span>
-              Planilha de Registro de Entrada
+              Planilha de Registro de Entrada <span className="text-xs font-normal text-muted-foreground">(opcional se já houver base)</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -253,7 +253,7 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
         <Button
           size="lg"
           disabled={!canProcess || isProcessing}
-          onClick={() => workbook && empresaId && onProcess(xmlFiles, workbook, selectedSheets, empresaId)}
+          onClick={() => empresaId && onProcess(xmlFiles, workbook, selectedSheets, empresaId)}
           className="bg-diretriz-red px-8 text-white hover:bg-diretriz-red/90 disabled:opacity-50"
         >
           {isProcessing ? (
