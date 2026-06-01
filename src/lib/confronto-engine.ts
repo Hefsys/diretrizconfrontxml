@@ -212,16 +212,15 @@ export function reconcileExcel(
     const xmlVal = xmlRow.valorXml ?? 0;
     const planilhaVal = row.valorContabil;
     const diff = Math.abs(planilhaVal - xmlVal);
-    const isCancelada = xmlRow.status === 'cancelada';
     results[i] = {
       ...xmlRow,
-      status: isCancelada ? 'cancelada' : (diff <= 0.01 ? 'ok' : 'divergente'),
+      status: diff <= 0.01 ? 'ok' : 'divergente',
       nNF: xmlRow.nNF || row.nNF,
       serie: xmlRow.serie || row.serie,
       cnpjEmitente: xmlRow.cnpjEmitente || row.cnpjEmitente,
       nomeEmitente: xmlRow.nomeEmitente || row.nomeEmitente,
       valorPlanilha: planilhaVal,
-      diferenca: isCancelada ? null : (diff > 0.01 ? planilhaVal - xmlVal : 0),
+      diferenca: diff > 0.01 ? planilhaVal - xmlVal : 0,
       sheetName: row.sheetName,
       cfop: row.cfop,
       isFrete: row.isFrete,
