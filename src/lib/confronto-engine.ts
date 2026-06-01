@@ -140,6 +140,125 @@ export function reconcileMissing(
   return { results, summary: recomputeSummary(results), matched, unmatched };
 }
 
+/**
+ * Reconcilia novas linhas de Excel (escrituração) com resultados atuais.
+ * Espelho de `reconcileMissing` — tenta casar linhas com XMLs marcados como
+ * `nao_escriturado`. Linhas sem correspondência viram novas entradas
+ * `ausente_xml` (com regras auto-OK para CPF/frete/ajuste zerado).
+ */
+export function reconcileExcel(
+  currentResults: ConfrontoResult[],
+  newExcelRows: ExcelNfeData[],
+  monthFilter?: (row: ConfrontoResult) => boolean
+): { results: ConfrontoResult[]; summary: ConfrontoSummary; matched: number; unmatched: number } {
+  const results = [...currentResults];
+  let matched = 0;
+  const usedRowIdx = new Set<number>();
+
+  const nnfCounts = new Map<string, number>();
+  for (const row of newExcelRows) {
+    if (!row.nNF) continue;
+    nnfCounts.set(row.nNF, (nnfCounts.get(row.nNF) ?? 0) + 1);
+  }
+
+  for (let i = 0; i < results.length; i++) {
+    const xmlRow = results[i];
+    if (xmlRow.status !== 'nao_escriturado') continue;
+    if (monthFilter && !monthFilter(xmlRow)) continue;
+
+    let rowIdx = -1;
+
+    // 1) chNFe
+    if (xmlRow.chNFe && xmlRow.chNFe.length === 44) {
+      rowIdx = newExcelRows.findIndex(
+        (r, idx) => !usedRowIdx.has(idx) && r.chNFe === xmlRow.chNFe
+      );
+    }
+
+    // 2) nNF + CNPJ
+    if (rowIdx === -1 && xmlRow.nNF && xmlRow.cnpjEmitente) {
+      const cnpjXml = cleanCnpj(xmlRow.cnpjEmitente);
+      rowIdx = newExcelRows.findIndex(
+        (r, idx) =>
+          !usedRowIdx.has(idx) &&
+          r.nNF === xmlRow.nNF &&
+          cleanCnpj(r.cnpjEmitente) === cnpjXml
+      );
+    }
+
+    // 3) nNF único
+    if (rowIdx === -1 && xmlRow.nNF && (nnfCounts.get(xmlRow.nNF) ?? 0) === 1) {
+      rowIdx = newExcelRows.findIndex(
+        (r, idx) => !usedRowIdx.has(idx) && r.nNF === xmlRow.nNF
+      );
+    }
+
+    // 4) CNPJ + valor aproximado
+    if (rowIdx === -1 && xmlRow.cnpjEmitente && xmlRow.valorXml != null) {
+      const cnpjXml = cleanCnpj(xmlRow.cnpjEmitente);
+      const xmlVal = xmlRow.valorXml;
+      rowIdx = newExcelRows.findIndex(
+        (r, idx) =>
+          !usedRowIdx.has(idx) &&
+          cleanCnpj(r.cnpjEmitente) === cnpjXml &&
+          r.valorContabil != null &&
+          Math.abs(r.valorContabil - xmlVal) <= 0.01
+      );
+    }
+
+    if (rowIdx === -1) continue;
+    usedRowIdx.add(rowIdx);
+    const row = newExcelRows[rowIdx];
+    const xmlVal = xmlRow.valorXml ?? 0;
+    const planilhaVal = row.valorContabil;
+    const diff = Math.abs(planilhaVal - xmlVal);
+    const isCancelada = xmlRow.status === 'cancelada';
+    results[i] = {
+      ...xmlRow,
+      status: isCancelada ? 'cancelada' : (diff <= 0.01 ? 'ok' : 'divergente'),
+      nNF: xmlRow.nNF || row.nNF,
+      serie: xmlRow.serie || row.serie,
+      cnpjEmitente: xmlRow.cnpjEmitente || row.cnpjEmitente,
+      nomeEmitente: xmlRow.nomeEmitente || row.nomeEmitente,
+      valorPlanilha: planilhaVal,
+      diferenca: isCancelada ? null : (diff > 0.01 ? planilhaVal - xmlVal : 0),
+      sheetName: row.sheetName,
+      cfop: row.cfop,
+      isFrete: row.isFrete,
+    };
+    matched++;
+  }
+
+  // Linhas Excel sem correspondência viram ausente_xml (com auto-OK)
+  let unmatched = 0;
+  for (let i = 0; i < newExcelRows.length; i++) {
+    if (usedRowIdx.has(i)) continue;
+    const row = newExcelRows[i];
+    const cpf = isCpf(row.cnpjEmitente);
+    const ajuste = isAjusteZerado(row.cfop, row.valorContabil);
+    const autoOk = row.isFrete || cpf || ajuste;
+    const valorPlanilha = row.valorContabil;
+    results.push({
+      status: autoOk ? 'ok' : 'ausente_xml',
+      nNF: row.nNF,
+      serie: row.serie,
+      data: row.dataDocumento || row.dataEntrada,
+      cnpjEmitente: row.cnpjEmitente,
+      nomeEmitente: row.nomeEmitente || (row.isFrete ? 'CT-e (Frete)' : (ajuste ? 'Ajuste/Estorno (CFOP 2949)' : (cpf ? 'Pessoa Física (CPF)' : ''))),
+      valorPlanilha,
+      valorXml: autoOk ? valorPlanilha : null,
+      diferenca: autoOk ? 0 : null,
+      chNFe: row.chNFe,
+      sheetName: row.sheetName,
+      cfop: row.cfop,
+      isFrete: row.isFrete,
+    });
+    unmatched++;
+  }
+
+  return { results, summary: recomputeSummary(results), matched, unmatched };
+}
+
 export function runConfronto(
   excelData: ExcelNfeData[],
   xmlData: XmlNfeData[]
