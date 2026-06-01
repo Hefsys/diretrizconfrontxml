@@ -728,6 +728,65 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!excelSheetDialog} onOpenChange={(o) => !isAddingExcel && !o && setExcelSheetDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Selecione as abas para processar</DialogTitle>
+            <DialogDescription>
+              Marque as abas da planilha que devem ser importadas e reconciliadas com os XMLs já carregados.
+            </DialogDescription>
+          </DialogHeader>
+          {excelSheetDialog && (
+            <div className="flex flex-wrap gap-2 py-2">
+              {excelSheetDialog.sheets.map((name) => {
+                const active = excelSheetDialog.selected.includes(name);
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() =>
+                      setExcelSheetDialog((d) =>
+                        d
+                          ? {
+                              ...d,
+                              selected: active ? d.selected.filter((s) => s !== name) : [...d.selected, name],
+                            }
+                          : d
+                      )
+                    }
+                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                      active
+                        ? 'border-diretriz-red bg-diretriz-red text-white'
+                        : 'border-border bg-background text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcelSheetDialog(null)} disabled={isAddingExcel}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!excelSheetDialog || excelSheetDialog.selected.length === 0) return;
+                const { workbook, selected } = excelSheetDialog;
+                setExcelSheetDialog(null);
+                await processExcelSheets(workbook, selected);
+              }}
+              disabled={isAddingExcel || !excelSheetDialog || excelSheetDialog.selected.length === 0}
+              className="bg-diretriz-red text-white hover:bg-diretriz-red/90"
+            >
+              {isAddingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Processar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
