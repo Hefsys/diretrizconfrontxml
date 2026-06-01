@@ -1,52 +1,40 @@
+# Adicionar Excel no Confronto/Fechamento
+
 ## Objetivo
 
-Permitir que o usuário envie planilhas de Registro de Entrada ICMS direto pela aba **XMLs**, armazenando as linhas na base por empresa (igual aos XMLs). Reupload mescla automaticamente, ignorando linhas duplicadas. No confronto, as linhas armazenadas serão reutilizadas — sem precisar reenviar a planilha toda vez.
+Hoje o `ResultsSection` (usado tanto na tela de Confronto quanto no detalhe do Fechamento) só tem o botão **Adicionar XMLs**. Vamos adicionar um botão simétrico **Adicionar Excel** que faz reconciliação igualzinha à de XMLs.
 
-## Mudanças
+## Comportamento
 
-### 1. Banco — nova tabela `excel_linhas_armazenadas`
-Migration criando:
-- Colunas: `empresa_id`, `n_nf`, `serie`, `cnpj_emitente`, `nome_emitente`, `ch_nfe`, `data_entrada`, `data_documento`, `valor_contabil`, `v_bc`, `v_icms`, `v_st`, `cfop`, `sheet_name`, `competencia` (derivada de `data_documento`, formato `YYYY-MM`), `row_data` (jsonb com `ExcelNfeData` original), `uploaded_by`, `created_at`, `updated_at`
-- Chave única: `(empresa_id, n_nf, serie, cnpj_emitente, data_documento)` para deduplicação no upsert
-- GRANTs para `authenticated` e `service_role`
-- RLS espelhando `xmls_armazenados` (view aberta a autenticados, insert pelo próprio uploader, update do uploader/admin, delete só admin)
+O botão abre seletor `.xlsx/.xls`. Depois do parse das linhas selecionadas (mesmo fluxo do `parseSheet` + diálogo de seleção de abas):
 
-### 2. Frontend — aba XMLs vira "Base de NF-e"
-Em `src/routes/xmls.tsx`:
-- Adicionar um **seletor de tipo** no topo (Tabs ou ToggleGroup): **XMLs** | **Planilhas (Excel)**
-- Aba XMLs: comportamento atual (sem alteração visual relevante)
-- Aba Planilhas:
-  - Botão **"Adicionar Excel"** + seletor de planilha (igual ao fluxo do confronto: lê workbook, mostra abas, usuário escolhe quais importar)
-  - Lista as linhas armazenadas da empresa selecionada, com filtros equivalentes (busca por nº NF/CNPJ/emitente, competência, CFOP)
-  - Coluna de ações com exclusão por linha
-  - Resumo: total de linhas, total de competências cobertas
-
-### 3. Storage helper — `src/lib/excel-storage.ts` (novo)
-Espelha `xml-storage.ts`:
-- `salvarLinhasExcel(empresaId, uploadedBy, linhas)`: upsert com `onConflict` na chave única, `ignoreDuplicates: true`
-- `carregarLinhasDaEmpresa(empresaId)`: retorna `ExcelNfeData[]` reconstruídas a partir de `row_data`
-- `mesclarLinhas(a, b)`: dedup por `n_nf+serie+cnpj+data`
-
-### 4. Confronto — usa base armazenada automaticamente
-Em `src/routes/index.tsx` (`handleProcess`):
-- Após `parseSheet`, salvar as novas linhas via `salvarLinhasExcel`
-- Carregar linhas históricas da empresa via `carregarLinhasDaEmpresa` e mesclar com as recém-parseadas antes de chamar `runConfronto`
-- Toast informando quantas linhas novas foram salvas e quantas históricas foram consideradas
-
-A planilha continua opcional no upload do confronto — se o usuário só envia XMLs, o confronto roda contra as linhas já armazenadas da empresa.
+1. Salva as novas linhas na base `excel_linhas_armazenadas` da empresa (mesma `salvarLinhasExcel`, ignorando duplicatas).
+2. **Reconcilia** com os resultados atuais:
+   - Linhas Excel novas que casarem com um XML existente marcado como `nao_escriturado` → reclassifica para `ok` ou `divergente` (compara `valorPlanilha` vs `valorXml`, tolerância 0.01) e preenche dados da planilha.
+   - Linhas Excel sem correspondência viram novas entradas com status `ausente_xml` (espelho do que `reconcileMissing` faz com XMLs).
+   - Respeita o filtro de mês selecionado (igual ao XML — só reconcilia linhas dentro da competência ativa, ou todas se "todos").
+3. Chama `onUpdate(newResults, newSummary)` para persistir no fechamento quando em modo readOnly+onUpdate (mesmo padrão do XML).
+4. Toast no mesmo formato: `N nota(s) reconciliada(s) · M linha(s) sem correspondência adicionada(s) como "Ausente no XML" · K linha(s) salva(s) na base da empresa`.
 
 ## Detalhes técnicos
 
-**Deduplicação:** chave única composta `(empresa_id, n_nf, serie, cnpj_emitente, data_documento)`. Linhas sem `n_nf` numérico já são filtradas pelo `parseSheet`, então não chegam à base.
+**`src/lib/confronto-engine.ts`** — adicionar `reconcileExcel(currentResults, newExcelRows, monthFilter?)`:
+- Itera `currentResults` filtrando `status === 'nao_escriturado'` (XMLs sem escrituração) dentro de `monthFilter`.
+- Para cada um tenta casar com as novas linhas Excel via mesma escada: chNFe → nNF+CNPJ → nNF único → CNPJ+valor aproximado.
+- Match: atualiza `valorPlanilha`, `diferenca`, `status` (`ok` ou `divergente`), preserva `valorXml`/`chNFe`/`nomeEmitente` já presentes.
+- Linhas Excel não usadas viram novos `ConfrontoResult` com `status: 'ausente_xml'`, `valorXml: null`. Aplica as mesmas regras de "OK automático" já existentes (CPF emitente, CFOP de frete, CFOP de ajuste zerado) para não criar falsos ausentes.
+- Retorna `{ results, summary, matched, unmatched }`.
 
-**Competência:** derivada no momento do insert a partir de `data_documento` (parse `DD/MM/YYYY` → `YYYY-MM`), permitindo filtro por mês na listagem.
+**`src/components/ResultsSection.tsx`**:
+- Novo `excelInputRef` (`<input type="file" accept=".xlsx,.xls">`) e estado `isAddingExcel`.
+- Novo botão **Adicionar Excel** ao lado de "Adicionar XMLs", visível quando `canEditXmls`.
+- Se o workbook tiver múltiplas abas: reusa o `SheetSelectorDialog` já existente em `UploadSection` — extraí-lo para `src/components/SheetSelectorDialog.tsx` (componente compartilhado) para evitar duplicação. Se só tiver uma aba, processa direto.
+- Handler `processExcelFiles` chama `parseSheet` para cada aba selecionada, `salvarLinhasExcel`, depois `reconcileExcel`, depois `onUpdate` (se houver). Estende a dropzone do mês também para `.xlsx`/`.xls` (opcional — manter só botão é suficiente, vou manter só botão para não confundir a dropzone existente).
 
-**RLS:** mesma postura de `xmls_armazenados` — qualquer autenticado vê/insere; apenas uploader/admin atualiza; só admin exclui (o botão de excluir na UI fica visível mas falhará para não-admin — manter consistente com XMLs).
+**Arquivos tocados**
+- `src/lib/confronto-engine.ts` (adicionar `reconcileExcel`)
+- `src/components/ResultsSection.tsx` (botão + handler + dialog de seleção de aba)
+- `src/components/SheetSelectorDialog.tsx` (novo — extraído do `UploadSection`)
+- `src/components/UploadSection.tsx` (refatorar para usar o dialog compartilhado)
 
-**Sem mudança de tipos:** `ExcelNfeData` já existe e cobre todos os campos necessários.
-
-## Arquivos tocados
-- `supabase/migrations/<nova>.sql` (criar tabela + GRANTs + RLS)
-- `src/lib/excel-storage.ts` (novo)
-- `src/routes/xmls.tsx` (adicionar tabs XML/Excel + UI de upload e listagem)
-- `src/routes/index.tsx` (integrar carregamento/salvamento de linhas no confronto)
+Sem mudanças de banco, sem mudanças de tipos, sem mudanças de RLS — a tabela `excel_linhas_armazenadas` e `salvarLinhasExcel` já existem.
