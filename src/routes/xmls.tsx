@@ -368,6 +368,12 @@ function XmlsPage() {
             </Table>
           )}
         </Card>
+          </TabsContent>
+
+          <TabsContent value="excel" className="mt-0">
+            <ExcelBaseSection empresaId={empresaId} />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
