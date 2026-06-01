@@ -13,6 +13,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { LogOut, Database, Trash2, Search } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ExcelBaseSection } from '@/components/ExcelBaseSection';
 import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
 import { toast } from 'sonner';
 
@@ -218,10 +220,10 @@ function XmlsPage() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-semibold flex items-center gap-2">
-              <Database className="h-5 w-5 text-diretriz-red" /> Base de XMLs
+              <Database className="h-5 w-5 text-diretriz-red" /> Base de NF-e
             </h1>
             <p className="text-sm text-muted-foreground">
-              XMLs já armazenados são reutilizados automaticamente no próximo confronto da empresa.
+              XMLs e linhas de planilha armazenados são reutilizados automaticamente no próximo confronto.
             </p>
           </div>
           <Select value={empresaId} onValueChange={setEmpresaId}>
@@ -236,7 +238,13 @@ function XmlsPage() {
           </Select>
         </div>
 
-        <Card className="p-4 space-y-4">
+        <Tabs defaultValue="xmls" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="xmls">XMLs</TabsTrigger>
+            <TabsTrigger value="excel">Planilhas (Excel)</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="xmls" className="space-y-4 mt-0">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div className="relative md:col-span-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
