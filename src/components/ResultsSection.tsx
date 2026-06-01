@@ -89,13 +89,16 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
   const [searchNf, setSearchNf] = useState('');
   const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
   const [isAddingXmls, setIsAddingXmls] = useState(false);
+  const [isAddingExcel, setIsAddingExcel] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [competenciasFechadas] = useState<Set<string>>(new Set());
   const [isClosing, setIsClosing] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveTitulo, setSaveTitulo] = useState('');
   const [saveCompetencia, setSaveCompetencia] = useState<string>('');
+  const [excelSheetDialog, setExcelSheetDialog] = useState<{ workbook: import('xlsx').WorkBook; sheets: string[]; selected: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
 
   // Months available in the dataset, sorted chronologically with counts
   const monthsAvailable = useMemo(() => {
