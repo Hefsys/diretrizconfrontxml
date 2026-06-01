@@ -412,10 +412,23 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             className="hidden"
             onChange={handleXmlFiles}
           />
+          <input
+            ref={excelInputRef}
+            type="file"
+            accept=".xlsx,.xlsb,.xls"
+            className="hidden"
+            onChange={handleExcelFile}
+          />
           {canEditXmls && (
             <Button variant="outline" onClick={handleAddXmlsClick} disabled={isAddingXmls}>
               {isAddingXmls ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Adicionar XMLs
+            </Button>
+          )}
+          {canEditXmls && (
+            <Button variant="outline" onClick={handleAddExcelClick} disabled={isAddingExcel}>
+              {isAddingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Adicionar Excel
             </Button>
           )}
           {readOnly && (
