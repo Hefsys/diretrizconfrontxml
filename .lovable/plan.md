@@ -1,40 +1,56 @@
-# Adicionar Excel no Confronto/Fechamento
+## Contexto
 
-## Objetivo
+A planilha enviada (`RFS008_RegistroEntradaICMS`) deixou a regra da Yamaha clara. Para o emitente **YAMAHA MOTOR DA AMAZONIA LTDA — CNPJ 04.817.052/0001-06**, cada NF ocupa **duas (ou mais) linhas** no relatório:
 
-Hoje o `ResultsSection` (usado tanto na tela de Confronto quanto no detalhe do Fechamento) só tem o botão **Adicionar XMLs**. Vamos adicionar um botão simétrico **Adicionar Excel** que faz reconciliação igualzinha à de XMLs.
+- **Linha principal** (com Nº NF preenchido): tem `AA` (Valor Contábil) e geralmente `AR` (ICMS ST RET ENTRADA).
+- **Linha(s) de continuação** (sem Nº NF, só com observação em `AP`): trazem outros valores em `AR`, como **VALOR PIS/COFINS RET**.
 
-## Comportamento
+Exemplo da própria planilha — NF 3335869:
+- Linha 28: AA = 25.716,03 · AR = 657,81 (ICMS ST RET ENTRADA)
+- Linha 29: AR = 804,87 (VALOR PIS/COFINS RET)
+- vNF do XML = 25.716,03 + 657,81 + 804,87 = **27.178,71**
 
-O botão abre seletor `.xlsx/.xls`. Depois do parse das linhas selecionadas (mesmo fluxo do `parseSheet` + diálogo de seleção de abas):
+Hoje o parser **descarta** a linha de continuação (sem nNF) e por isso só compara AA contra o XML, gerando a divergência de R$ 394,15 (e similares) que aparece na tela.
 
-1. Salva as novas linhas na base `excel_linhas_armazenadas` da empresa (mesma `salvarLinhasExcel`, ignorando duplicatas).
-2. **Reconcilia** com os resultados atuais:
-   - Linhas Excel novas que casarem com um XML existente marcado como `nao_escriturado` → reclassifica para `ok` ou `divergente` (compara `valorPlanilha` vs `valorXml`, tolerância 0.01) e preenche dados da planilha.
-   - Linhas Excel sem correspondência viram novas entradas com status `ausente_xml` (espelho do que `reconcileMissing` faz com XMLs).
-   - Respeita o filtro de mês selecionado (igual ao XML — só reconcilia linhas dentro da competência ativa, ou todas se "todos").
-3. Chama `onUpdate(newResults, newSummary)` para persistir no fechamento quando em modo readOnly+onUpdate (mesmo padrão do XML).
-4. Toast no mesmo formato: `N nota(s) reconciliada(s) · M linha(s) sem correspondência adicionada(s) como "Ausente no XML" · K linha(s) salva(s) na base da empresa`.
+A segunda dor é só de UX: nas telas de XMLs e de Excel (aba "Planilhas (Excel)") só existe lixeira por linha — falta seleção múltipla e um filtro rápido para zerados.
 
-## Detalhes técnicos
+---
 
-**`src/lib/confronto-engine.ts`** — adicionar `reconcileExcel(currentResults, newExcelRows, monthFilter?)`:
-- Itera `currentResults` filtrando `status === 'nao_escriturado'` (XMLs sem escrituração) dentro de `monthFilter`.
-- Para cada um tenta casar com as novas linhas Excel via mesma escada: chNFe → nNF+CNPJ → nNF único → CNPJ+valor aproximado.
-- Match: atualiza `valorPlanilha`, `diferenca`, `status` (`ok` ou `divergente`), preserva `valorXml`/`chNFe`/`nomeEmitente` já presentes.
-- Linhas Excel não usadas viram novos `ConfrontoResult` com `status: 'ausente_xml'`, `valorXml: null`. Aplica as mesmas regras de "OK automático" já existentes (CPF emitente, CFOP de frete, CFOP de ajuste zerado) para não criar falsos ausentes.
-- Retorna `{ results, summary, matched, unmatched }`.
+## Plano
 
-**`src/components/ResultsSection.tsx`**:
-- Novo `excelInputRef` (`<input type="file" accept=".xlsx,.xls">`) e estado `isAddingExcel`.
-- Novo botão **Adicionar Excel** ao lado de "Adicionar XMLs", visível quando `canEditXmls`.
-- Se o workbook tiver múltiplas abas: reusa o `SheetSelectorDialog` já existente em `UploadSection` — extraí-lo para `src/components/SheetSelectorDialog.tsx` (componente compartilhado) para evitar duplicação. Se só tiver uma aba, processa direto.
-- Handler `processExcelFiles` chama `parseSheet` para cada aba selecionada, `salvarLinhasExcel`, depois `reconcileExcel`, depois `onUpdate` (se houver). Estende a dropzone do mês também para `.xlsx`/`.xls` (opcional — manter só botão é suficiente, vou manter só botão para não confundir a dropzone existente).
+### 1. Regra Yamaha — somar AR das linhas de continuação
 
-**Arquivos tocados**
-- `src/lib/confronto-engine.ts` (adicionar `reconcileExcel`)
-- `src/components/ResultsSection.tsx` (botão + handler + dialog de seleção de aba)
-- `src/components/SheetSelectorDialog.tsx` (novo — extraído do `UploadSection`)
-- `src/components/UploadSection.tsx` (refatorar para usar o dialog compartilhado)
+**`src/lib/excel-parser.ts`**
+- Adicionar `CNPJS_SOMA_AR = new Set<string>(['04817052000106'])` (Yamaha). Estrutura para receber outros CNPJs no futuro.
+- No loop de `parseSheet`, quando a linha atual **não tem** `nNF` mas **tem** valor em `AR` (coluna absoluta 43, índice 0-based) **e existe uma linha anterior já emitida cujo `cnpjEmitente` está em `CNPJS_SOMA_AR`**, somar esse `AR` ao `valorContabil` da última linha emitida. Sem criar novo registro para a linha de continuação.
+- Para a própria linha principal da Yamaha (com nNF), somar também o `AR` da própria linha ao `valorContabil` na hora de criar o registro.
+- Coluna `AR` é fixa (índice 43) — não está no `colMap`. Como o relatório RFS008 tem layout estável, ler direto por índice posicional. Adicionar comentário explicando.
 
-Sem mudanças de banco, sem mudanças de tipos, sem mudanças de RLS — a tabela `excel_linhas_armazenadas` e `salvarLinhasExcel` já existem.
+**`src/lib/confronto-engine.ts`** — nenhuma mudança; segue comparando `valorContabil` vs `vNF` normalmente.
+
+### 2. Seleção múltipla + exclusão em massa
+
+Aplicar o mesmo padrão nas duas telas:
+
+**`src/routes/xmls.tsx`** (aba "XMLs")
+- Coluna de checkbox à esquerda + checkbox "selecionar todos" no header (respeita filtro atual).
+- Barra de ação que aparece quando há seleção: `N selecionados` + botão **"Excluir selecionados"** (vermelho, com confirm).
+- `delete().in('id', ids)` em lote, atualiza o estado local.
+
+**`src/components/ExcelBaseSection.tsx`** (aba "Planilhas (Excel)")
+- Mesma estrutura: checkboxes, header "selecionar todos", botão "Excluir selecionados".
+- Adicionar um **filtro rápido "Somente zerados"** (switch ou item no select de status já existente) que mostra apenas linhas com `valor_contabil = 0` (ou `null`/`0`).
+- Botão extra **"Selecionar todos os zerados"** que marca de uma vez todas as linhas zeradas visíveis — facilita o caso de uso mais comum.
+
+### 3. Detalhes técnicos
+
+- Usar componente `Checkbox` do shadcn já presente em `src/components/ui/checkbox.tsx`.
+- Estado: `const [selected, setSelected] = useState<Set<string>>(new Set())`. Limpar ao trocar empresa / filtros que mudam a lista, ou após excluir.
+- Exclusão em massa: dialog `AlertDialog` confirmando "Excluir N linhas? Esta ação não pode ser desfeita." em vez de `confirm()` nativo.
+- Critério "zerado" usado no filtro/seleção: `valor_contabil == null || Number(valor_contabil) === 0`.
+
+### 4. Fora de escopo
+
+- Nada muda nos fechamentos já salvos (eles continuam com o snapshot antigo). Confrontos novos passam a usar a regra correta da Yamaha.
+- Nenhuma migração de banco.
+- Nenhuma alteração na tela de Resultados do Confronto.

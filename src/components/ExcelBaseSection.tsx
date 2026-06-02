@@ -12,6 +12,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Trash2, Search, Upload } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { readWorkbook, getSheetNames, autoDetectSheet, parseSheet } from '@/lib/excel-parser';
 import { salvarLinhasExcel } from '@/lib/excel-storage';
@@ -66,6 +69,10 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
   const [competenciaFiltro, setCompetenciaFiltro] = useState('todas');
   const [cnpjFiltro, setCnpjFiltro] = useState('todos');
   const [cfopFiltro, setCfopFiltro] = useState('todos');
+  const [somenteZerados, setSomenteZerados] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const isZerado = (l: LinhaRow) => l.valor_contabil == null || Number(l.valor_contabil) === 0;
 
   const carregar = async (id: string) => {
     if (!id) {
@@ -89,6 +96,7 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
   };
 
   useEffect(() => {
+    setSelected(new Set());
     void carregar(empresaId);
   }, [empresaId]);
 
@@ -146,13 +154,14 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
       if (competenciaFiltro !== 'todas' && l.competencia !== competenciaFiltro) return false;
       if (cnpjFiltro !== 'todos' && l.cnpj_emitente !== cnpjFiltro) return false;
       if (cfopFiltro !== 'todos' && l.cfop !== cfopFiltro) return false;
+      if (somenteZerados && !isZerado(l)) return false;
       if (q) {
         const hay = `${l.n_nf} ${l.nome_emitente ?? ''} ${l.cnpj_emitente ?? ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [linhas, search, competenciaFiltro, cnpjFiltro, cfopFiltro]);
+  }, [linhas, search, competenciaFiltro, cnpjFiltro, cfopFiltro, somenteZerados]);
 
   const excluir = async (id: string) => {
     if (!confirm('Excluir esta linha da base? Essa ação não pode ser desfeita.')) return;
@@ -163,6 +172,50 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
     }
     toast.success('Linha excluída');
     setLinhas((prev) => prev.filter((x) => x.id !== id));
+    setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
+  };
+
+  const excluirSelecionados = async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    if (!confirm(`Excluir ${ids.length} linha(s) da base? Essa ação não pode ser desfeita.`)) return;
+    const { error } = await supabase.from('excel_linhas_armazenadas').delete().in('id', ids);
+    if (error) {
+      toast.error('Não foi possível excluir', { description: error.message });
+      return;
+    }
+    toast.success(`${ids.length} linha(s) excluída(s)`);
+    const idSet = new Set(ids);
+    setLinhas((prev) => prev.filter((x) => !idSet.has(x.id)));
+    setSelected(new Set());
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const visibleIds = linhasFiltradas.map((x) => x.id);
+      const allSelected = visibleIds.length > 0 && visibleIds.every((id) => prev.has(id));
+      const n = new Set(prev);
+      if (allSelected) visibleIds.forEach((id) => n.delete(id));
+      else visibleIds.forEach((id) => n.add(id));
+      return n;
+    });
+  };
+
+  const selecionarZerados = () => {
+    const zeradosVisiveis = linhasFiltradas.filter(isZerado).map((l) => l.id);
+    setSelected((prev) => {
+      const n = new Set(prev);
+      zeradosVisiveis.forEach((id) => n.add(id));
+      return n;
+    });
   };
 
   return (
@@ -243,8 +296,29 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
             </Select>
           </div>
         </div>
-        <div className="text-sm text-muted-foreground">
-          {loading ? 'Carregando...' : `${linhasFiltradas.length} de ${linhas.length} linhas`}
+        <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="text-sm text-muted-foreground">
+              {loading ? 'Carregando...' : `${linhasFiltradas.length} de ${linhas.length} linhas`}
+              {selected.size > 0 && <span className="ml-3 font-medium text-foreground">· {selected.size} selecionada(s)</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="somente-zerados" checked={somenteZerados} onCheckedChange={setSomenteZerados} />
+              <Label htmlFor="somente-zerados" className="text-sm cursor-pointer">Somente zerados</Label>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {linhasFiltradas.some(isZerado) && (
+              <Button variant="outline" size="sm" onClick={selecionarZerados}>
+                Selecionar zerados
+              </Button>
+            )}
+            {selected.size > 0 && (
+              <Button variant="destructive" size="sm" onClick={excluirSelecionados}>
+                <Trash2 className="h-4 w-4" /> Excluir selecionadas ({selected.size})
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -263,6 +337,13 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={linhasFiltradas.length > 0 && linhasFiltradas.every((l) => selected.has(l.id))}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Selecionar todas"
+                  />
+                </TableHead>
                 <TableHead>Nº NF</TableHead>
                 <TableHead>Série</TableHead>
                 <TableHead>Data Doc.</TableHead>
@@ -276,7 +357,14 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
             </TableHeader>
             <TableBody>
               {linhasFiltradas.map((l) => (
-                <TableRow key={l.id}>
+                <TableRow key={l.id} data-state={selected.has(l.id) ? 'selected' : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selected.has(l.id)}
+                      onCheckedChange={() => toggleSelected(l.id)}
+                      aria-label={`Selecionar linha ${l.n_nf}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-mono">{l.n_nf}</TableCell>
                   <TableCell className="font-mono text-xs">{l.serie || '—'}</TableCell>
                   <TableCell className="text-xs">{l.data_documento || '—'}</TableCell>

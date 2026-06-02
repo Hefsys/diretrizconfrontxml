@@ -13,6 +13,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { LogOut, Database, Trash2, Search } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ExcelBaseSection } from '@/components/ExcelBaseSection';
 import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
@@ -85,6 +86,7 @@ function XmlsPage() {
   const [empresaId, setEmpresaId] = useState<string>('');
   const [xmls, setXmls] = useState<XmlRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // filtros
   const [search, setSearch] = useState('');
@@ -178,7 +180,48 @@ function XmlsPage() {
     }
     toast.success('XML excluído');
     setXmls((prev) => prev.filter((x) => x.id !== id));
+    setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
   };
+
+  const excluirSelecionados = async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    if (!confirm(`Excluir ${ids.length} XML(s) da base? Essa ação não pode ser desfeita.`)) return;
+    const { error } = await supabase.from('xmls_armazenados').delete().in('id', ids);
+    if (error) {
+      toast.error('Não foi possível excluir', { description: error.message });
+      return;
+    }
+    toast.success(`${ids.length} XML(s) excluído(s)`);
+    const idSet = new Set(ids);
+    setXmls((prev) => prev.filter((x) => !idSet.has(x.id)));
+    setSelected(new Set());
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const visibleIds = xmlsFiltrados.map((x) => x.id);
+      const allSelected = visibleIds.length > 0 && visibleIds.every((id) => prev.has(id));
+      if (allSelected) {
+        const n = new Set(prev);
+        visibleIds.forEach((id) => n.delete(id));
+        return n;
+      }
+      const n = new Set(prev);
+      visibleIds.forEach((id) => n.add(id));
+      return n;
+    });
+  };
+
+  useEffect(() => { setSelected(new Set()); }, [empresaId]);
 
   if (authLoading || !user) {
     return (
@@ -294,8 +337,20 @@ function XmlsPage() {
             </div>
           </div>
 
-          <div className="text-sm text-muted-foreground">
-            {loading ? 'Carregando...' : `${xmlsFiltrados.length} de ${xmls.length} XMLs`}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="text-sm text-muted-foreground">
+              {loading ? 'Carregando...' : `${xmlsFiltrados.length} de ${xmls.length} XMLs`}
+              {selected.size > 0 && <span className="ml-3 font-medium text-foreground">· {selected.size} selecionado(s)</span>}
+            </div>
+            {selected.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={excluirSelecionados}
+              >
+                <Trash2 className="h-4 w-4" /> Excluir selecionados ({selected.size})
+              </Button>
+            )}
           </div>
         </Card>
 
@@ -314,6 +369,13 @@ function XmlsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={xmlsFiltrados.length > 0 && xmlsFiltrados.every((x) => selected.has(x.id))}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Selecionar todos"
+                    />
+                  </TableHead>
                   <TableHead>Nº NF</TableHead>
                   <TableHead>Série</TableHead>
                   <TableHead>Emissão</TableHead>
@@ -328,7 +390,14 @@ function XmlsPage() {
               </TableHeader>
               <TableBody>
                 {xmlsFiltrados.map((x) => (
-                  <TableRow key={x.id}>
+                  <TableRow key={x.id} data-state={selected.has(x.id) ? 'selected' : undefined}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selected.has(x.id)}
+                        onCheckedChange={() => toggleSelected(x.id)}
+                        aria-label={`Selecionar XML ${x.n_nf ?? x.id}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-mono">{x.n_nf ?? '—'}</TableCell>
                     <TableCell className="font-mono text-xs">{x.serie ?? '—'}</TableCell>
                     <TableCell className="text-xs">
