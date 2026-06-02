@@ -337,6 +337,13 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={linhasFiltradas.length > 0 && linhasFiltradas.every((l) => selected.has(l.id))}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Selecionar todas"
+                  />
+                </TableHead>
                 <TableHead>Nº NF</TableHead>
                 <TableHead>Série</TableHead>
                 <TableHead>Data Doc.</TableHead>
@@ -350,7 +357,14 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
             </TableHeader>
             <TableBody>
               {linhasFiltradas.map((l) => (
-                <TableRow key={l.id}>
+                <TableRow key={l.id} data-state={selected.has(l.id) ? 'selected' : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selected.has(l.id)}
+                      onCheckedChange={() => toggleSelected(l.id)}
+                      aria-label={`Selecionar linha ${l.n_nf}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-mono">{l.n_nf}</TableCell>
                   <TableCell className="font-mono text-xs">{l.serie || '—'}</TableCell>
                   <TableCell className="text-xs">{l.data_documento || '—'}</TableCell>
