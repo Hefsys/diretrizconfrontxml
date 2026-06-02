@@ -369,6 +369,13 @@ function XmlsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={xmlsFiltrados.length > 0 && xmlsFiltrados.every((x) => selected.has(x.id))}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Selecionar todos"
+                    />
+                  </TableHead>
                   <TableHead>Nº NF</TableHead>
                   <TableHead>Série</TableHead>
                   <TableHead>Emissão</TableHead>
@@ -383,7 +390,14 @@ function XmlsPage() {
               </TableHeader>
               <TableBody>
                 {xmlsFiltrados.map((x) => (
-                  <TableRow key={x.id}>
+                  <TableRow key={x.id} data-state={selected.has(x.id) ? 'selected' : undefined}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selected.has(x.id)}
+                        onCheckedChange={() => toggleSelected(x.id)}
+                        aria-label={`Selecionar XML ${x.n_nf ?? x.id}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-mono">{x.n_nf ?? '—'}</TableCell>
                     <TableCell className="font-mono text-xs">{x.serie ?? '—'}</TableCell>
                     <TableCell className="text-xs">
