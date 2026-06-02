@@ -337,8 +337,20 @@ function XmlsPage() {
             </div>
           </div>
 
-          <div className="text-sm text-muted-foreground">
-            {loading ? 'Carregando...' : `${xmlsFiltrados.length} de ${xmls.length} XMLs`}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="text-sm text-muted-foreground">
+              {loading ? 'Carregando...' : `${xmlsFiltrados.length} de ${xmls.length} XMLs`}
+              {selected.size > 0 && <span className="ml-3 font-medium text-foreground">· {selected.size} selecionado(s)</span>}
+            </div>
+            {selected.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={excluirSelecionados}
+              >
+                <Trash2 className="h-4 w-4" /> Excluir selecionados ({selected.size})
+              </Button>
+            )}
           </div>
         </Card>
 
