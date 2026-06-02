@@ -296,8 +296,29 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
             </Select>
           </div>
         </div>
-        <div className="text-sm text-muted-foreground">
-          {loading ? 'Carregando...' : `${linhasFiltradas.length} de ${linhas.length} linhas`}
+        <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="text-sm text-muted-foreground">
+              {loading ? 'Carregando...' : `${linhasFiltradas.length} de ${linhas.length} linhas`}
+              {selected.size > 0 && <span className="ml-3 font-medium text-foreground">· {selected.size} selecionada(s)</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="somente-zerados" checked={somenteZerados} onCheckedChange={setSomenteZerados} />
+              <Label htmlFor="somente-zerados" className="text-sm cursor-pointer">Somente zerados</Label>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {linhasFiltradas.some(isZerado) && (
+              <Button variant="outline" size="sm" onClick={selecionarZerados}>
+                Selecionar zerados
+              </Button>
+            )}
+            {selected.size > 0 && (
+              <Button variant="destructive" size="sm" onClick={excluirSelecionados}>
+                <Trash2 className="h-4 w-4" /> Excluir selecionadas ({selected.size})
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
 
