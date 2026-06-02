@@ -12,6 +12,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Trash2, Search, Upload } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { readWorkbook, getSheetNames, autoDetectSheet, parseSheet } from '@/lib/excel-parser';
 import { salvarLinhasExcel } from '@/lib/excel-storage';
