@@ -86,6 +86,7 @@ function XmlsPage() {
   const [empresaId, setEmpresaId] = useState<string>('');
   const [xmls, setXmls] = useState<XmlRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // filtros
   const [search, setSearch] = useState('');
