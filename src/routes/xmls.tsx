@@ -180,7 +180,48 @@ function XmlsPage() {
     }
     toast.success('XML excluído');
     setXmls((prev) => prev.filter((x) => x.id !== id));
+    setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
   };
+
+  const excluirSelecionados = async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    if (!confirm(`Excluir ${ids.length} XML(s) da base? Essa ação não pode ser desfeita.`)) return;
+    const { error } = await supabase.from('xmls_armazenados').delete().in('id', ids);
+    if (error) {
+      toast.error('Não foi possível excluir', { description: error.message });
+      return;
+    }
+    toast.success(`${ids.length} XML(s) excluído(s)`);
+    const idSet = new Set(ids);
+    setXmls((prev) => prev.filter((x) => !idSet.has(x.id)));
+    setSelected(new Set());
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const visibleIds = xmlsFiltrados.map((x) => x.id);
+      const allSelected = visibleIds.length > 0 && visibleIds.every((id) => prev.has(id));
+      if (allSelected) {
+        const n = new Set(prev);
+        visibleIds.forEach((id) => n.delete(id));
+        return n;
+      }
+      const n = new Set(prev);
+      visibleIds.forEach((id) => n.add(id));
+      return n;
+    });
+  };
+
+  useEffect(() => { setSelected(new Set()); }, [empresaId]);
 
   if (authLoading || !user) {
     return (
