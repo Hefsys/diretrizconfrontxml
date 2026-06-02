@@ -69,6 +69,10 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
   const [competenciaFiltro, setCompetenciaFiltro] = useState('todas');
   const [cnpjFiltro, setCnpjFiltro] = useState('todos');
   const [cfopFiltro, setCfopFiltro] = useState('todos');
+  const [somenteZerados, setSomenteZerados] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const isZerado = (l: LinhaRow) => l.valor_contabil == null || Number(l.valor_contabil) === 0;
 
   const carregar = async (id: string) => {
     if (!id) {
