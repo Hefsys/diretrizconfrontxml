@@ -154,13 +154,14 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
       if (competenciaFiltro !== 'todas' && l.competencia !== competenciaFiltro) return false;
       if (cnpjFiltro !== 'todos' && l.cnpj_emitente !== cnpjFiltro) return false;
       if (cfopFiltro !== 'todos' && l.cfop !== cfopFiltro) return false;
+      if (somenteZerados && !isZerado(l)) return false;
       if (q) {
         const hay = `${l.n_nf} ${l.nome_emitente ?? ''} ${l.cnpj_emitente ?? ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [linhas, search, competenciaFiltro, cnpjFiltro, cfopFiltro]);
+  }, [linhas, search, competenciaFiltro, cnpjFiltro, cfopFiltro, somenteZerados]);
 
   const excluir = async (id: string) => {
     if (!confirm('Excluir esta linha da base? Essa ação não pode ser desfeita.')) return;
@@ -171,6 +172,50 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
     }
     toast.success('Linha excluída');
     setLinhas((prev) => prev.filter((x) => x.id !== id));
+    setSelected((prev) => { const n = new Set(prev); n.delete(id); return n; });
+  };
+
+  const excluirSelecionados = async () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    if (!confirm(`Excluir ${ids.length} linha(s) da base? Essa ação não pode ser desfeita.`)) return;
+    const { error } = await supabase.from('excel_linhas_armazenadas').delete().in('id', ids);
+    if (error) {
+      toast.error('Não foi possível excluir', { description: error.message });
+      return;
+    }
+    toast.success(`${ids.length} linha(s) excluída(s)`);
+    const idSet = new Set(ids);
+    setLinhas((prev) => prev.filter((x) => !idSet.has(x.id)));
+    setSelected(new Set());
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelected((prev) => {
+      const visibleIds = linhasFiltradas.map((x) => x.id);
+      const allSelected = visibleIds.length > 0 && visibleIds.every((id) => prev.has(id));
+      const n = new Set(prev);
+      if (allSelected) visibleIds.forEach((id) => n.delete(id));
+      else visibleIds.forEach((id) => n.add(id));
+      return n;
+    });
+  };
+
+  const selecionarZerados = () => {
+    const zeradosVisiveis = linhasFiltradas.filter(isZerado).map((l) => l.id);
+    setSelected((prev) => {
+      const n = new Set(prev);
+      zeradosVisiveis.forEach((id) => n.add(id));
+      return n;
+    });
   };
 
   return (
