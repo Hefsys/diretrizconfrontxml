@@ -96,6 +96,7 @@ export function ExcelBaseSection({ empresaId }: { empresaId: string }) {
   };
 
   useEffect(() => {
+    setSelected(new Set());
     void carregar(empresaId);
   }, [empresaId]);
 
