@@ -13,6 +13,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { LogOut, Database, Trash2, Search } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ExcelBaseSection } from '@/components/ExcelBaseSection';
 import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
