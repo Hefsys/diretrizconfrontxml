@@ -22,6 +22,14 @@ export const CFOPS_FRETE_IGNORADOS = new Set<string>([
 // CFOPs de ajuste/estorno — quando valor contábil é zero, ignorar de "ausentes"
 export const CFOPS_AJUSTE_ZERADO = new Set<string>(['2949', '1949']);
 
+// Emitentes em que o relatório RFS008 quebra valores extras (PIS/COFINS RET,
+// ICMS ST RET ENTRADA, etc.) em linhas de continuação logo abaixo da NF principal.
+// Para esses CNPJs somamos a coluna AR (índice 43) da linha principal e de
+// todas as linhas de continuação (sem nNF) ao Valor Contábil da NF.
+// Yamaha Motor da Amazônia LTDA — 04.817.052/0001-06.
+const CNPJS_SOMA_AR = new Set<string>(['04817052000106']);
+const AR_COL_INDEX = 43; // coluna AR (1-based 44) no layout fixo do RFS008
+
 function normalizeStr(s: string): string {
   return s
     .toLowerCase()
