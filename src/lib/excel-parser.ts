@@ -158,6 +158,25 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     const nNF = colMap.nNF >= 0 ? String(row[colMap.nNF] ?? '').trim() : '';
     const cnpj = colMap.cnpj >= 0 ? cleanCnpj(String(row[colMap.cnpj] ?? '')) : '';
 
+    const parseCell = (v: unknown): number => {
+      if (typeof v === 'number') return v;
+      const s = String(v ?? '').replace(/[^\d,.\-]/g, '').replace(',', '.');
+      return parseFloat(s) || 0;
+    };
+
+    // Linha de continuação (sem nNF e sem CNPJ): para Yamaha (e outros CNPJs
+    // de CNPJS_SOMA_AR), somar o valor da coluna AR ao Valor Contábil da
+    // última NF emitida.
+    if (!nNF && !cnpj) {
+      const last = results[results.length - 1];
+      if (last && CNPJS_SOMA_AR.has(last.cnpjEmitente)) {
+        const arVal = parseCell(row[AR_COL_INDEX]);
+        if (arVal !== 0) {
+          last.valorContabil = +(last.valorContabil + arVal).toFixed(2);
+        }
+      }
+      continue;
+    }
     // Skip rows that don't look like data (need at least nNF or CNPJ)
     if (!nNF && !cnpj) continue;
     // Skip if nNF is not numeric
@@ -172,13 +191,13 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     }
 
     const valorStr = colMap.valorContabil >= 0 ? row[colMap.valorContabil] : 0;
-    const valor = typeof valorStr === 'number' ? valorStr : parseFloat(String(valorStr).replace(/[^\d,.\-]/g, '').replace(',', '.')) || 0;
+    let valor = typeof valorStr === 'number' ? valorStr : parseFloat(String(valorStr).replace(/[^\d,.\-]/g, '').replace(',', '.')) || 0;
 
-    const parseCell = (v: unknown): number => {
-      if (typeof v === 'number') return v;
-      const s = String(v ?? '').replace(/[^\d,.\-]/g, '').replace(',', '.');
-      return parseFloat(s) || 0;
-    };
+    // Para Yamaha & cia, somar AR da própria linha principal ao Valor Contábil.
+    if (cnpj && CNPJS_SOMA_AR.has(cnpj)) {
+      const arVal = parseCell(row[AR_COL_INDEX]);
+      if (arVal !== 0) valor = +(valor + arVal).toFixed(2);
+    }
 
     results.push({
       nNF,
