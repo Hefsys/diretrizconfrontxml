@@ -193,11 +193,9 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     const valorStr = colMap.valorContabil >= 0 ? row[colMap.valorContabil] : 0;
     let valor = typeof valorStr === 'number' ? valorStr : parseFloat(String(valorStr).replace(/[^\d,.\-]/g, '').replace(',', '.')) || 0;
 
-    // Para Yamaha & cia, somar AR da própria linha principal ao Valor Contábil.
-    if (cnpj && CNPJS_SOMA_AR.has(cnpj)) {
-      const arVal = parseCell(row[AR_COL_INDEX]);
-      if (arVal !== 0) valor = +(valor + arVal).toFixed(2);
-    }
+    // Nota: para Yamaha (CNPJS_SOMA_AR), o AA da linha principal já inclui o
+    // AR dela (ICMS ST RET ENTRADA). Só somamos o AR das linhas de continuação
+    // (tratado no bloco acima, sem nNF).
 
     results.push({
       nNF,
