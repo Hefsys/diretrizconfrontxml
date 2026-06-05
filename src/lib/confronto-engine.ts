@@ -459,5 +459,6 @@ export function sanitizeLegacyResults(
       diferenca: 0,
     };
   });
-  return { results, summary: recomputeSummary(results), changed };
+  const deduped = dedupResults(results);
+  return { results: deduped, summary: recomputeSummary(deduped), changed: changed + (results.length - deduped.length) };
 }
