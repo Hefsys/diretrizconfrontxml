@@ -25,6 +25,35 @@ export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
 }
 
 /**
+ * Chave única para detectar duplicatas de resultado.
+ * - chNFe (44 dígitos) é a chave preferida.
+ * - Fallback: nNF|serie|CNPJ|valor (planilha ou xml).
+ */
+function resultKey(r: ConfrontoResult): string {
+  if (r.chNFe && r.chNFe.length === 44) return `ch:${r.chNFe}`;
+  const cnpj = cleanCnpj(r.cnpjEmitente ?? '');
+  const valor = r.valorPlanilha ?? r.valorXml ?? '';
+  return `n:${r.nNF ?? ''}|${r.serie ?? ''}|${cnpj}|${valor}`;
+}
+
+/**
+ * Remove resultados duplicados. Mantém a 1ª ocorrência, mas troca quando o
+ * existente é `ok`/`cancelada` e o novo é `divergente` (mantém o pior status visível).
+ */
+export function dedupResults(results: ConfrontoResult[]): ConfrontoResult[] {
+  const map = new Map<string, ConfrontoResult>();
+  for (const r of results) {
+    const k = resultKey(r);
+    const existing = map.get(k);
+    if (!existing) { map.set(k, r); continue; }
+    if ((existing.status === 'ok' || existing.status === 'cancelada') && r.status === 'divergente') {
+      map.set(k, r);
+    }
+  }
+  return Array.from(map.values());
+}
+
+/**
  * Extracts a YYYY-MM key from a date string.
  * Accepts "DD/MM/AAAA", "DD/MM/AAAA HH:mm", and ISO "AAAA-MM-DDTHH:mm:ss".
  * Returns "sem-data" when no valid date can be parsed.
