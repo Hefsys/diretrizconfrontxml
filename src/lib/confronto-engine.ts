@@ -192,7 +192,14 @@ export function reconcileExcel(
 
   for (let i = 0; i < results.length; i++) {
     const xmlRow = results[i];
-    if (xmlRow.status !== 'nao_escriturado') continue;
+    // Reconcilia/atualiza qualquer linha cujo valor de planilha possa mudar
+    // após reprocessar o Excel (inclui linhas já divergentes/ok/ausente_xml).
+    if (
+      xmlRow.status !== 'nao_escriturado' &&
+      xmlRow.status !== 'divergente' &&
+      xmlRow.status !== 'ok' &&
+      xmlRow.status !== 'ausente_xml'
+    ) continue;
     if (monthFilter && !monthFilter(xmlRow)) continue;
 
     let rowIdx = -1;
@@ -222,8 +229,13 @@ export function reconcileExcel(
       );
     }
 
-    // 4) CNPJ + valor aproximado
-    if (rowIdx === -1 && xmlRow.cnpjEmitente && xmlRow.valorXml != null) {
+    // 4) CNPJ + valor aproximado (somente para nao_escriturado, onde temos só XML)
+    if (
+      rowIdx === -1 &&
+      xmlRow.status === 'nao_escriturado' &&
+      xmlRow.cnpjEmitente &&
+      xmlRow.valorXml != null
+    ) {
       const cnpjXml = cleanCnpj(xmlRow.cnpjEmitente);
       const xmlVal = xmlRow.valorXml;
       rowIdx = newExcelRows.findIndex(
@@ -238,18 +250,25 @@ export function reconcileExcel(
     if (rowIdx === -1) continue;
     usedRowIdx.add(rowIdx);
     const row = newExcelRows[rowIdx];
-    const xmlVal = xmlRow.valorXml ?? 0;
+    const xmlVal = xmlRow.valorXml;
     const planilhaVal = row.valorContabil;
-    const diff = Math.abs(planilhaVal - xmlVal);
+    // Recalcula status: se há XML, compara; se não, mantém ausente_xml.
+    let newStatus = xmlRow.status;
+    let diff: number | null = xmlRow.diferenca;
+    if (xmlVal != null) {
+      const d = Math.abs(planilhaVal - xmlVal);
+      newStatus = d <= 0.01 ? 'ok' : 'divergente';
+      diff = d > 0.01 ? planilhaVal - xmlVal : 0;
+    }
     results[i] = {
       ...xmlRow,
-      status: diff <= 0.01 ? 'ok' : 'divergente',
+      status: newStatus,
       nNF: xmlRow.nNF || row.nNF,
       serie: xmlRow.serie || row.serie,
       cnpjEmitente: xmlRow.cnpjEmitente || row.cnpjEmitente,
       nomeEmitente: xmlRow.nomeEmitente || row.nomeEmitente,
       valorPlanilha: planilhaVal,
-      diferenca: diff > 0.01 ? planilhaVal - xmlVal : 0,
+      diferenca: diff,
       sheetName: row.sheetName,
       cfop: row.cfop,
       isFrete: row.isFrete,
