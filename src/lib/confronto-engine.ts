@@ -284,7 +284,8 @@ export function reconcileExcel(
     unmatched++;
   }
 
-  return { results, summary: recomputeSummary(results), matched, unmatched };
+  const deduped = dedupResults(results);
+  return { results: deduped, summary: recomputeSummary(deduped), matched, unmatched };
 }
 
 export function runConfronto(
