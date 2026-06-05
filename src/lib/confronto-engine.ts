@@ -409,7 +409,8 @@ export function runConfronto(
     });
   }
 
-  return { results, summary: recomputeSummary(results) };
+  const deduped = dedupResults(results);
+  return { results: deduped, summary: recomputeSummary(deduped) };
 }
 
 /**
