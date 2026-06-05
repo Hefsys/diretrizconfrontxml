@@ -55,12 +55,15 @@ export async function salvarLinhasExcel(
 
   if (rows.length === 0) return 0;
 
+  // Sobrescreve linhas existentes (mesma empresa/nNF/serie/CNPJ/data_documento)
+  // com os valores recém-parseados. Isso garante que correções no parser
+  // (ex.: soma de AR para Yamaha) atualizem o histórico em reuploads.
   const { data, error } = await supabase
     .from('excel_linhas_armazenadas')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .upsert(rows as any, {
       onConflict: 'empresa_id,n_nf,serie,cnpj_emitente,data_documento',
-      ignoreDuplicates: true,
+      ignoreDuplicates: false,
     })
     .select('id');
 
