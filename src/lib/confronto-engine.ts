@@ -166,7 +166,7 @@ export function reconcileMissing(
     unmatched++;
   }
 
-  return { results, summary: recomputeSummary(results), matched, unmatched };
+  return { results: dedupResults(results), summary: recomputeSummary(dedupResults(results)), matched, unmatched };
 }
 
 /**
