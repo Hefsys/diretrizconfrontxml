@@ -111,8 +111,10 @@ export function reconcileMissing(
       );
     }
 
-    // 3) Fallback: nNF apenas (somente se único no conjunto novo)
-    if (xmlIdx === -1 && row.nNF && (nnfCounts.get(row.nNF) ?? 0) === 1) {
+    // 3) Fallback: nNF apenas (somente se único no conjunto novo E a linha não tem CNPJ).
+    // Se a linha da planilha tem CNPJ e não casou no step 2, é NF de outro emitente
+    // (ex.: frete vs. produto com mesmo nº de NF) — não podemos casar só por nNF.
+    if (xmlIdx === -1 && row.nNF && !row.cnpjEmitente && (nnfCounts.get(row.nNF) ?? 0) === 1) {
       xmlIdx = newXmlData.findIndex(
         (xml, idx) => !usedXmlIdx.has(idx) && xml.nNF === row.nNF
       );
