@@ -350,8 +350,9 @@ export function runConfronto(
       if (idx !== undefined && !usedXmlIdx.has(idx)) matchedIdx = idx;
     }
 
-    // 3) Fallback: nNF apenas (somente se único)
-    if (matchedIdx === -1 && row.nNF && (nnfCounts.get(row.nNF) ?? 0) === 1) {
+    // 3) Fallback: nNF apenas — só quando a linha da planilha não tem CNPJ.
+    // Evita casar linhas de frete (transportadora) com XML de produto de mesmo nNF.
+    if (matchedIdx === -1 && row.nNF && !row.cnpjEmitente && (nnfCounts.get(row.nNF) ?? 0) === 1) {
       matchedIdx = xmlData.findIndex(
         (xml, idx) => !usedXmlIdx.has(idx) && xml.nNF === row.nNF
       );
