@@ -111,8 +111,10 @@ export function reconcileMissing(
       );
     }
 
-    // 3) Fallback: nNF apenas (somente se único no conjunto novo)
-    if (xmlIdx === -1 && row.nNF && (nnfCounts.get(row.nNF) ?? 0) === 1) {
+    // 3) Fallback: nNF apenas (somente se único no conjunto novo E a linha não tem CNPJ).
+    // Se a linha da planilha tem CNPJ e não casou no step 2, é NF de outro emitente
+    // (ex.: frete vs. produto com mesmo nº de NF) — não podemos casar só por nNF.
+    if (xmlIdx === -1 && row.nNF && !row.cnpjEmitente && (nnfCounts.get(row.nNF) ?? 0) === 1) {
       xmlIdx = newXmlData.findIndex(
         (xml, idx) => !usedXmlIdx.has(idx) && xml.nNF === row.nNF
       );
@@ -222,8 +224,8 @@ export function reconcileExcel(
       );
     }
 
-    // 3) nNF único
-    if (rowIdx === -1 && xmlRow.nNF && (nnfCounts.get(xmlRow.nNF) ?? 0) === 1) {
+    // 3) nNF único — só quando a linha do XML não tem CNPJ para desambiguar
+    if (rowIdx === -1 && xmlRow.nNF && !xmlRow.cnpjEmitente && (nnfCounts.get(xmlRow.nNF) ?? 0) === 1) {
       rowIdx = newExcelRows.findIndex(
         (r, idx) => !usedRowIdx.has(idx) && r.nNF === xmlRow.nNF
       );
@@ -348,8 +350,9 @@ export function runConfronto(
       if (idx !== undefined && !usedXmlIdx.has(idx)) matchedIdx = idx;
     }
 
-    // 3) Fallback: nNF apenas (somente se único)
-    if (matchedIdx === -1 && row.nNF && (nnfCounts.get(row.nNF) ?? 0) === 1) {
+    // 3) Fallback: nNF apenas — só quando a linha da planilha não tem CNPJ.
+    // Evita casar linhas de frete (transportadora) com XML de produto de mesmo nNF.
+    if (matchedIdx === -1 && row.nNF && !row.cnpjEmitente && (nnfCounts.get(row.nNF) ?? 0) === 1) {
       matchedIdx = xmlData.findIndex(
         (xml, idx) => !usedXmlIdx.has(idx) && xml.nNF === row.nNF
       );
