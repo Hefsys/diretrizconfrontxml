@@ -143,6 +143,22 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     return arr;
   }, [resultsForMonth, filter, searchNf]);
 
+  // Paginação da tabela (evita renderizar milhares de linhas de uma vez)
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(100);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageStart = safePage * pageSize;
+  const paged = useMemo(
+    () => filtered.slice(pageStart, pageStart + pageSize),
+    [filtered, pageStart, pageSize]
+  );
+
+  useEffect(() => {
+    setPage(0);
+  }, [filter, searchNf, selectedMonth, pageSize]);
+
+
   // Competências válidas para escolher como rótulo da análise (exclui "sem-data")
   const competenciasOpcoes = useMemo(
     () => monthsAvailable.map((m) => m.key).filter((k) => k !== 'sem-data'),
