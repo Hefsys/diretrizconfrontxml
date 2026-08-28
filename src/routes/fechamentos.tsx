@@ -58,7 +58,20 @@ function FechamentosPage() {
   const [loading, setLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FechamentoMensal | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [exportingId, setExportingId] = useState<string | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+
+  const handleExport = async (f: FechamentoMensal) => {
+    setExportingId(f.id);
+    const resultados = await carregarResultados(f.id);
+    setExportingId(null);
+    if (resultados.length === 0) {
+      toast.error('Não foi possível carregar os resultados desta análise');
+      return;
+    }
+    exportResults(resultados);
+  };
+
 
   const reload = () => {
     if (!user) return;
