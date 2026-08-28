@@ -674,8 +674,38 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
               </Table>
             </TooltipProvider>
           </div>
+          {filtered.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm">
+              <span className="text-muted-foreground">
+                {(pageStart + 1).toLocaleString('pt-BR')}–{Math.min(pageStart + pageSize, filtered.length).toLocaleString('pt-BR')} de{' '}
+                {filtered.length.toLocaleString('pt-BR')} linhas
+              </span>
+              <div className="flex items-center gap-2">
+                <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+                  <SelectTrigger className="h-8 w-[130px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[50, 100, 250, 500].map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n} por página</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>
+                  Anterior
+                </Button>
+                <span className="text-muted-foreground whitespace-nowrap">
+                  {safePage + 1} / {totalPages}
+                </span>
+                <Button variant="outline" size="sm" disabled={safePage >= totalPages - 1} onClick={() => setPage(safePage + 1)}>
+                  Próxima
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
 
       <AlertDialog open={deleteIdx !== null} onOpenChange={(open) => !open && setDeleteIdx(null)}>
         <AlertDialogContent>
