@@ -247,11 +247,15 @@ function FechamentosPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => exportResults(f.resultados)}
+                          disabled={exportingId === f.id}
+                          onClick={() => handleExport(f)}
                           title="Baixar Excel"
                         >
-                          <Download className="h-4 w-4" />
+                          {exportingId === f.id
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <Download className="h-4 w-4" />}
                         </Button>
+
                         <Button
                           variant="ghost"
                           size="sm"
