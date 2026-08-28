@@ -602,10 +602,11 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((row, i) => {
+                  {paged.map((row, i) => {
                     const cfg = STATUS_CONFIG[row.status];
                     return (
-                      <TableRow key={i} className={i % 2 === 0 ? '' : 'bg-muted/30'}>
+                      <TableRow key={pageStart + i} className={i % 2 === 0 ? '' : 'bg-muted/30'}>
+
                         <TableCell>
                           <Badge
                             variant="outline"
