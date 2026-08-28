@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { listarFechamentos, excluirFechamento } from '@/lib/fechamentos';
+import { listarFechamentos, excluirFechamento, carregarResultados } from '@/lib/fechamentos';
 import { exportResults } from '@/lib/export-excel';
 import type { FechamentoMensal } from '@/lib/types';
 import { Button } from '@/components/ui/button';
