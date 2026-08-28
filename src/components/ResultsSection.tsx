@@ -651,7 +651,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  onClick={() => setDeleteIdx(i)}
+                                  onClick={() => setDeleteIdx(pageStart + i)}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
