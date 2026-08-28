@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { listarFechamentos, excluirFechamento } from '@/lib/fechamentos';
+import { listarFechamentos, excluirFechamento, carregarResultados } from '@/lib/fechamentos';
 import { exportResults } from '@/lib/export-excel';
 import type { FechamentoMensal } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -58,7 +58,20 @@ function FechamentosPage() {
   const [loading, setLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FechamentoMensal | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [exportingId, setExportingId] = useState<string | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
+
+  const handleExport = async (f: FechamentoMensal) => {
+    setExportingId(f.id);
+    const resultados = await carregarResultados(f.id);
+    setExportingId(null);
+    if (resultados.length === 0) {
+      toast.error('Não foi possível carregar os resultados desta análise');
+      return;
+    }
+    exportResults(resultados);
+  };
+
 
   const reload = () => {
     if (!user) return;
@@ -234,11 +247,15 @@ function FechamentosPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => exportResults(f.resultados)}
+                          disabled={exportingId === f.id}
+                          onClick={() => handleExport(f)}
                           title="Baixar Excel"
                         >
-                          <Download className="h-4 w-4" />
+                          {exportingId === f.id
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <Download className="h-4 w-4" />}
                         </Button>
+
                         <Button
                           variant="ghost"
                           size="sm"

@@ -48,6 +48,8 @@ function FechamentoDetailPage() {
   const [empresaNome, setEmpresaNome] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [canUpdateFechamento, setCanUpdateFechamento] = useState(false);
   const [pendingFix, setPendingFix] = useState<{ results: ConfrontoResult[]; summary: ConfrontoSummary; changed: number } | null>(null);
   const [savingFix, setSavingFix] = useState(false);
@@ -60,43 +62,68 @@ function FechamentoDetailPage() {
     if (!user) return;
     let cancelled = false;
     setLoading(true);
+    setNotFound(false);
+    setLoadError(null);
     setCanUpdateFechamento(false);
-    supabase
-      .from('fechamentos_mensais')
-      .select('*')
-      .eq('id', fechamentoId)
-      .maybeSingle()
-      .then(async ({ data, error }) => {
-        if (cancelled) return;
-        if (error || !data) {
-          setNotFound(true);
-          setLoading(false);
-          return;
-        }
-        const f = data as unknown as FechamentoMensal;
-        const sane = sanitizeLegacyResults(f.resultados);
-        if (sane.changed > 0) {
-          setFechamento({ ...f, resultados: sane.results, resumo: sane.summary });
-          setPendingFix(sane);
-        } else {
-          setFechamento(f);
-        }
-        setCanUpdateFechamento(true);
-        const { data: emp } = await supabase
-          .from('empresas')
-          .select('razao_social')
-          .eq('id', f.empresa_id)
-          .maybeSingle();
-        if (!cancelled && emp) setEmpresaNome(emp.razao_social);
+
+    (async () => {
+      const { data, error } = await supabase
+        .from('fechamentos_mensais')
+        .select('*')
+        .eq('id', fechamentoId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) {
+        setLoadError(error.message);
         setLoading(false);
-      });
+        return;
+      }
+      if (!data) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+      const f = data as unknown as FechamentoMensal;
+      const sane = sanitizeLegacyResults(f.resultados);
+      if (sane.changed > 0) {
+        setFechamento({ ...f, resultados: sane.results, resumo: sane.summary });
+        setPendingFix(sane);
+      } else {
+        setFechamento(f);
+      }
+      setCanUpdateFechamento(true);
+      setLoading(false);
+
+      // Nome da empresa carrega em paralelo, sem bloquear a tela
+      const { data: emp } = await supabase
+        .from('empresas')
+        .select('razao_social')
+        .eq('id', f.empresa_id)
+        .maybeSingle();
+      if (!cancelled && emp) setEmpresaNome(emp.razao_social);
+    })();
+
     return () => { cancelled = true; };
-  }, [user, fechamentoId]);
+  }, [user, fechamentoId, reloadKey]);
 
   if (authLoading || !user || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background">
         <span className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <p className="text-sm text-muted-foreground">Carregando análise…</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+        <h1 className="text-xl font-semibold">Não foi possível carregar a análise</h1>
+        <p className="max-w-md text-sm text-muted-foreground">{loadError}</p>
+        <div className="flex gap-2">
+          <Button onClick={() => setReloadKey((k) => k + 1)}>Tentar novamente</Button>
+          <Button variant="outline" onClick={() => navigate({ to: '/fechamentos' })}>Voltar</Button>
+        </div>
       </div>
     );
   }
@@ -109,6 +136,7 @@ function FechamentoDetailPage() {
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-background">

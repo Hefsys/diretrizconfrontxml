@@ -143,6 +143,22 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     return arr;
   }, [resultsForMonth, filter, searchNf]);
 
+  // Paginação da tabela (evita renderizar milhares de linhas de uma vez)
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(100);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1);
+  const pageStart = safePage * pageSize;
+  const paged = useMemo(
+    () => filtered.slice(pageStart, pageStart + pageSize),
+    [filtered, pageStart, pageSize]
+  );
+
+  useEffect(() => {
+    setPage(0);
+  }, [filter, searchNf, selectedMonth, pageSize]);
+
+
   // Competências válidas para escolher como rótulo da análise (exclui "sem-data")
   const competenciasOpcoes = useMemo(
     () => monthsAvailable.map((m) => m.key).filter((k) => k !== 'sem-data'),
@@ -586,10 +602,11 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filtered.map((row, i) => {
+                  {paged.map((row, i) => {
                     const cfg = STATUS_CONFIG[row.status];
                     return (
-                      <TableRow key={i} className={i % 2 === 0 ? '' : 'bg-muted/30'}>
+                      <TableRow key={pageStart + i} className={i % 2 === 0 ? '' : 'bg-muted/30'}>
+
                         <TableCell>
                           <Badge
                             variant="outline"
@@ -634,7 +651,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  onClick={() => setDeleteIdx(i)}
+                                  onClick={() => setDeleteIdx(pageStart + i)}
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -657,8 +674,38 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
               </Table>
             </TooltipProvider>
           </div>
+          {filtered.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm">
+              <span className="text-muted-foreground">
+                {(pageStart + 1).toLocaleString('pt-BR')}–{Math.min(pageStart + pageSize, filtered.length).toLocaleString('pt-BR')} de{' '}
+                {filtered.length.toLocaleString('pt-BR')} linhas
+              </span>
+              <div className="flex items-center gap-2">
+                <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+                  <SelectTrigger className="h-8 w-[130px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[50, 100, 250, 500].map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n} por página</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>
+                  Anterior
+                </Button>
+                <span className="text-muted-foreground whitespace-nowrap">
+                  {safePage + 1} / {totalPages}
+                </span>
+                <Button variant="outline" size="sm" disabled={safePage >= totalPages - 1} onClick={() => setPage(safePage + 1)}>
+                  Próxima
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
 
       <AlertDialog open={deleteIdx !== null} onOpenChange={(open) => !open && setDeleteIdx(null)}>
         <AlertDialogContent>
