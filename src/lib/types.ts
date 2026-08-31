@@ -81,7 +81,10 @@ export interface ConfrontoResult {
   sheetName?: string;
   cfop?: string;
   isFrete?: boolean;
+  /** Valor contábil zerado — ocultada do relatório por padrão. */
+  isZerada?: boolean;
 }
+
 
 export interface ConfrontoSummary {
   totalPlanilha: number;
