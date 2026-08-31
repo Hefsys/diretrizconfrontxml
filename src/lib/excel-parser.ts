@@ -247,7 +247,9 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
       sheetName,
       isFrete,
       cfop: cfopRaw || undefined,
+      isZerada: valor === 0,
     });
+
   }
 
   return results;
