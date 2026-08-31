@@ -18,12 +18,6 @@ function normSerie(v: string | null | undefined): string {
   return digits || '0';
 }
 
-/** CNPJs compatíveis: iguais, ou ao menos um dos lados sem CNPJ informado. */
-function cnpjCompat(a: string | null | undefined, b: string | null | undefined): boolean {
-  const x = cleanCnpj(a ?? '');
-  const y = cleanCnpj(b ?? '');
-  return !x || !y || x === y;
-}
 
 
 /** CNPJs relevantes de um XML: emitente e destinatário (nota emitida pela própria empresa). */
