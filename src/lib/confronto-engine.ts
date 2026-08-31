@@ -339,7 +339,9 @@ export function reconcileExcel(
       sheetName: row.sheetName,
       cfop: row.cfop,
       isFrete: row.isFrete,
+      isZerada: row.isZerada ?? planilhaVal === 0,
     };
+
     matched++;
   }
 
