@@ -501,7 +501,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
               type="checkbox"
               checked={showZeradas}
               onChange={(e) => setShowZeradas(e.target.checked)}
-              className="h-4 w-4 accent-[hsl(var(--diretriz-red))]"
+              className="h-4 w-4 accent-[var(--diretriz-red)]"
             />
             Mostrar notas zeradas ({zeradasCount})
           </label>
