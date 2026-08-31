@@ -87,6 +87,8 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
   const [filter, setFilter] = useState<FilterType>('todos');
   const [selectedMonth, setSelectedMonth] = useState<MonthSelection>('todos');
   const [searchNf, setSearchNf] = useState('');
+  const [showZeradas, setShowZeradas] = useState(false);
+
   const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
   const [isAddingXmls, setIsAddingXmls] = useState(false);
   const [isAddingExcel, setIsAddingExcel] = useState(false);
