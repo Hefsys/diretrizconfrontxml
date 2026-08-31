@@ -484,16 +484,30 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
       </div>
 
       {/* Search by NF number */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Buscar por nº da NF…"
-          value={searchNf}
-          onChange={(e) => setSearchNf(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="relative max-w-sm flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Buscar por nº da NF…"
+            value={searchNf}
+            onChange={(e) => setSearchNf(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {zeradasCount > 0 && (
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={showZeradas}
+              onChange={(e) => setShowZeradas(e.target.checked)}
+              className="h-4 w-4 accent-[hsl(var(--diretriz-red))]"
+            />
+            Mostrar notas zeradas ({zeradasCount})
+          </label>
+        )}
       </div>
+
 
       {/* Month chips */}
       {monthsAvailable.length > 0 && (
