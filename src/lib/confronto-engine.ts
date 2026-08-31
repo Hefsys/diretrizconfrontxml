@@ -12,6 +12,20 @@ function isCpf(v: string | null | undefined): boolean {
   return cleanCnpj(v ?? '').length === 11;
 }
 
+/** Normaliza a série ("069 " → "69", "" → "0") para comparação. */
+function normSerie(v: string | null | undefined): string {
+  const digits = String(v ?? '').replace(/\D/g, '').replace(/^0+/, '');
+  return digits || '0';
+}
+
+/** CNPJs compatíveis: iguais, ou ao menos um dos lados sem CNPJ informado. */
+function cnpjCompat(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = cleanCnpj(a ?? '');
+  const y = cleanCnpj(b ?? '');
+  return !x || !y || x === y;
+}
+
+
 export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
   return {
     totalPlanilha: results.filter((r) => r.valorPlanilha !== null).length,
@@ -111,7 +125,32 @@ export function reconcileMissing(
       );
     }
 
+    // 2b) Match por nNF + série (relatórios sem CNPJ, ex. RFS008 Modelo A)
+    if (xmlIdx === -1 && row.nNF) {
+      const serieRow = normSerie(row.serie);
+      xmlIdx = newXmlData.findIndex(
+        (xml, idx) =>
+          !usedXmlIdx.has(idx) &&
+          xml.nNF === row.nNF &&
+          normSerie(xml.serie) === serieRow &&
+          cnpjCompat(xml.cnpjEmitente, row.cnpjEmitente)
+      );
+    }
+
+    // 2c) Match por nNF + valor aproximado
+    if (xmlIdx === -1 && row.nNF && row.valorPlanilha != null) {
+      const planilhaVal = row.valorPlanilha;
+      xmlIdx = newXmlData.findIndex(
+        (xml, idx) =>
+          !usedXmlIdx.has(idx) &&
+          xml.nNF === row.nNF &&
+          Math.abs(xml.vNF - planilhaVal) <= 0.01 &&
+          cnpjCompat(xml.cnpjEmitente, row.cnpjEmitente)
+      );
+    }
+
     // 3) Fallback: nNF apenas (somente se único no conjunto novo E a linha não tem CNPJ).
+
     // Se a linha da planilha tem CNPJ e não casou no step 2, é NF de outro emitente
     // (ex.: frete vs. produto com mesmo nº de NF) — não podemos casar só por nNF.
     if (xmlIdx === -1 && row.nNF && !row.cnpjEmitente && (nnfCounts.get(row.nNF) ?? 0) === 1) {
@@ -224,7 +263,33 @@ export function reconcileExcel(
       );
     }
 
+    // 2b) nNF + série
+    if (rowIdx === -1 && xmlRow.nNF) {
+      const serieXml = normSerie(xmlRow.serie);
+      rowIdx = newExcelRows.findIndex(
+        (r, idx) =>
+          !usedRowIdx.has(idx) &&
+          r.nNF === xmlRow.nNF &&
+          normSerie(r.serie) === serieXml &&
+          cnpjCompat(r.cnpjEmitente, xmlRow.cnpjEmitente)
+      );
+    }
+
+    // 2c) nNF + valor aproximado
+    if (rowIdx === -1 && xmlRow.nNF && xmlRow.valorXml != null) {
+      const xmlVal0 = xmlRow.valorXml;
+      rowIdx = newExcelRows.findIndex(
+        (r, idx) =>
+          !usedRowIdx.has(idx) &&
+          r.nNF === xmlRow.nNF &&
+          r.valorContabil != null &&
+          Math.abs(r.valorContabil - xmlVal0) <= 0.01 &&
+          cnpjCompat(r.cnpjEmitente, xmlRow.cnpjEmitente)
+      );
+    }
+
     // 3) nNF único — só quando a linha do XML não tem CNPJ para desambiguar
+
     if (rowIdx === -1 && xmlRow.nNF && !xmlRow.cnpjEmitente && (nnfCounts.get(xmlRow.nNF) ?? 0) === 1) {
       rowIdx = newExcelRows.findIndex(
         (r, idx) => !usedRowIdx.has(idx) && r.nNF === xmlRow.nNF
@@ -274,7 +339,9 @@ export function reconcileExcel(
       sheetName: row.sheetName,
       cfop: row.cfop,
       isFrete: row.isFrete,
+      isZerada: row.isZerada ?? planilhaVal === 0,
     };
+
     matched++;
   }
 
@@ -301,7 +368,9 @@ export function reconcileExcel(
       sheetName: row.sheetName,
       cfop: row.cfop,
       isFrete: row.isFrete,
+      isZerada: row.isZerada ?? valorPlanilha === 0,
     });
+
     unmatched++;
   }
 
@@ -319,6 +388,7 @@ export function runConfronto(
   // Build XML lookup structures (CNPJ sempre normalizado nos dois lados)
   const xmlByChave = new Map<string, number>();
   const xmlByNnfCnpj = new Map<string, number>();
+  const xmlByNnf = new Map<string, number[]>();
   const nnfCounts = new Map<string, number>();
 
   for (let i = 0; i < xmlData.length; i++) {
@@ -330,6 +400,8 @@ export function runConfronto(
       const key = `${xml.nNF}_${cleanCnpj(xml.cnpjEmitente ?? '')}`;
       if (!xmlByNnfCnpj.has(key)) xmlByNnfCnpj.set(key, i);
       nnfCounts.set(xml.nNF, (nnfCounts.get(xml.nNF) ?? 0) + 1);
+      const list = xmlByNnf.get(xml.nNF);
+      if (list) list.push(i); else xmlByNnf.set(xml.nNF, [i]);
     }
   }
 
@@ -348,6 +420,31 @@ export function runConfronto(
       const key = `${row.nNF}_${cleanCnpj(row.cnpjEmitente)}`;
       const idx = xmlByNnfCnpj.get(key);
       if (idx !== undefined && !usedXmlIdx.has(idx)) matchedIdx = idx;
+    }
+
+    // 2b) Match por nNF + série (relatórios sem CNPJ, ex. RFS008 Modelo A)
+    if (matchedIdx === -1 && row.nNF) {
+      const serieRow = normSerie(row.serie);
+      const cand = xmlByNnf.get(row.nNF) ?? [];
+      const found = cand.find(
+        (idx) =>
+          !usedXmlIdx.has(idx) &&
+          normSerie(xmlData[idx].serie) === serieRow &&
+          cnpjCompat(xmlData[idx].cnpjEmitente, row.cnpjEmitente)
+      );
+      if (found !== undefined) matchedIdx = found;
+    }
+
+    // 2c) Match por nNF + valor aproximado
+    if (matchedIdx === -1 && row.nNF && row.valorContabil != null) {
+      const cand = xmlByNnf.get(row.nNF) ?? [];
+      const found = cand.find(
+        (idx) =>
+          !usedXmlIdx.has(idx) &&
+          Math.abs(xmlData[idx].vNF - row.valorContabil) <= 0.01 &&
+          cnpjCompat(xmlData[idx].cnpjEmitente, row.cnpjEmitente)
+      );
+      if (found !== undefined) matchedIdx = found;
     }
 
     // 3) Fallback: nNF apenas — só quando a linha da planilha não tem CNPJ.
@@ -369,6 +466,7 @@ export function runConfronto(
       );
     }
 
+
     const matchedXml = matchedIdx >= 0 ? xmlData[matchedIdx] : undefined;
 
     if (matchedXml) {
@@ -389,7 +487,9 @@ export function runConfronto(
         sheetName: row.sheetName,
         cfop: row.cfop,
         isFrete: row.isFrete,
+        isZerada: row.isZerada ?? valorPlanilha === 0,
       });
+
     } else {
       const cpf = isCpf(row.cnpjEmitente);
       const ajuste = isAjusteZerado(row.cfop, row.valorContabil);
@@ -409,7 +509,9 @@ export function runConfronto(
         sheetName: row.sheetName,
         cfop: row.cfop,
         isFrete: row.isFrete,
+        isZerada: row.isZerada ?? valorPlanilha === 0,
       });
+
     }
   }
 
@@ -455,7 +557,13 @@ export function sanitizeLegacyResults(
   input: ConfrontoResult[]
 ): { results: ConfrontoResult[]; summary: ConfrontoSummary; changed: number } {
   let changed = 0;
-  const results = input.map((r) => {
+  const results = input.map((r0) => {
+    // Marca notas zeradas (valor contábil 0) para poderem ser ocultadas.
+    let r = r0;
+    if (r.isZerada === undefined && r.valorPlanilha === 0) {
+      r = { ...r, isZerada: true };
+      changed++;
+    }
     if (r.status !== 'ausente_xml') return r;
     const cpf = isCpf(r.cnpjEmitente);
     const cfopFrete = !!(r.cfop && CFOPS_FRETE_IGNORADOS.has(r.cfop));
@@ -481,6 +589,7 @@ export function sanitizeLegacyResults(
       diferenca: 0,
     };
   });
+
   const deduped = dedupResults(results);
   return { results: deduped, summary: recomputeSummary(deduped), changed: changed + (results.length - deduped.length) };
 }

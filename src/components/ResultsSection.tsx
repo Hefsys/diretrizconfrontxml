@@ -25,7 +25,7 @@ import {
 import { Label } from '@/components/ui/label';
 import type { ConfrontoResult, ConfrontoSummary, ConfrontoStatus } from '@/lib/types';
 import { exportResults } from '@/lib/export-excel';
-import { getMonthKey } from '@/lib/confronto-engine';
+import { getMonthKey, recomputeSummary } from '@/lib/confronto-engine';
 import { fecharMes } from '@/lib/fechamentos';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -87,6 +87,8 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
   const [filter, setFilter] = useState<FilterType>('todos');
   const [selectedMonth, setSelectedMonth] = useState<MonthSelection>('todos');
   const [searchNf, setSearchNf] = useState('');
+  const [showZeradas, setShowZeradas] = useState(false);
+
   const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
   const [isAddingXmls, setIsAddingXmls] = useState(false);
   const [isAddingExcel, setIsAddingExcel] = useState(false);
@@ -100,10 +102,19 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
   const fileInputRef = useRef<HTMLInputElement>(null);
   const excelInputRef = useRef<HTMLInputElement>(null);
 
+  // Notas zeradas (valor contábil 0) — ocultas por padrão
+  const isZeradaRow = (r: ConfrontoResult) =>
+    r.isZerada ?? (r.valorPlanilha === 0 && (r.valorXml ?? 0) === 0);
+  const zeradasCount = useMemo(() => results.filter(isZeradaRow).length, [results]);
+  const visibleResults = useMemo(
+    () => (showZeradas ? results : results.filter((r) => !isZeradaRow(r))),
+    [results, showZeradas]
+  );
+
   // Months available in the dataset, sorted chronologically with counts
   const monthsAvailable = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const r of results) {
+    for (const r of visibleResults) {
       const key = getMonthKey(r.data);
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
@@ -114,27 +125,19 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
         return a.localeCompare(b);
       })
       .map(([key, count]) => ({ key, count }));
-  }, [results]);
+  }, [visibleResults]);
 
   // Results filtered by selected month
   const resultsForMonth = useMemo(
-    () => (selectedMonth === 'todos' ? results : results.filter((r) => getMonthKey(r.data) === selectedMonth)),
-    [results, selectedMonth]
+    () => (selectedMonth === 'todos' ? visibleResults : visibleResults.filter((r) => getMonthKey(r.data) === selectedMonth)),
+    [visibleResults, selectedMonth]
   );
 
-  // Summary recalculated for the selected month
-  const summaryForMonth = useMemo<ConfrontoSummary>(() => {
-    if (selectedMonth === 'todos') return summary;
-    return {
-      totalPlanilha: resultsForMonth.filter((r) => r.valorPlanilha !== null).length,
-      totalXmls: resultsForMonth.filter((r) => r.valorXml !== null).length,
-      ok: resultsForMonth.filter((r) => r.status === 'ok').length,
-      divergentes: resultsForMonth.filter((r) => r.status === 'divergente').length,
-      ausentes: resultsForMonth.filter((r) => r.status === 'ausente_xml').length,
-      naoEscriturados: resultsForMonth.filter((r) => r.status === 'nao_escriturado').length,
-      canceladas: resultsForMonth.filter((r) => r.status === 'cancelada').length,
-    };
-  }, [resultsForMonth, selectedMonth, summary]);
+  // Summary recalculated for the current visible set
+  const summaryForMonth = useMemo<ConfrontoSummary>(
+    () => recomputeSummary(resultsForMonth),
+    [resultsForMonth]
+  );
 
   const filtered = useMemo(() => {
     let arr = filter === 'todos' ? resultsForMonth : resultsForMonth.filter((r) => r.status === filter);
@@ -142,6 +145,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     if (q) arr = arr.filter((r) => r.nNF && r.nNF.includes(q));
     return arr;
   }, [resultsForMonth, filter, searchNf]);
+
 
   // Paginação da tabela (evita renderizar milhares de linhas de uma vez)
   const [page, setPage] = useState(0);
@@ -156,7 +160,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
 
   useEffect(() => {
     setPage(0);
-  }, [filter, searchNf, selectedMonth, pageSize]);
+  }, [filter, searchNf, selectedMonth, pageSize, showZeradas]);
 
 
   // Competências válidas para escolher como rótulo da análise (exclui "sem-data")
@@ -206,12 +210,13 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
         competencia: saveCompetencia,
         titulo,
         fechadoPor: user.id,
-        resumo: summary,
-        resultados: results,
+        resumo: recomputeSummary(visibleResults),
+        resultados: visibleResults,
       });
       if (res.ok) {
         toast.success('Análise salva em Fechamentos');
-        exportResults(results);
+        exportResults(visibleResults);
+
         setSaveDialogOpen(false);
         navigate({ to: '/fechamentos' });
       } else {
@@ -480,16 +485,30 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
       </div>
 
       {/* Search by NF number */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Buscar por nº da NF…"
-          value={searchNf}
-          onChange={(e) => setSearchNf(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="relative max-w-sm flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Buscar por nº da NF…"
+            value={searchNf}
+            onChange={(e) => setSearchNf(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {zeradasCount > 0 && (
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={showZeradas}
+              onChange={(e) => setShowZeradas(e.target.checked)}
+              className="h-4 w-4 accent-[var(--diretriz-red)]"
+            />
+            Mostrar notas zeradas ({zeradasCount})
+          </label>
+        )}
       </div>
+
 
       {/* Month chips */}
       {monthsAvailable.length > 0 && (
@@ -503,7 +522,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
                 : 'border-border bg-background text-foreground hover:bg-muted'
             }`}
           >
-            Todos ({results.length})
+            Todos ({visibleResults.length})
           </button>
           {monthsAvailable.map((m) => {
             const closed = competenciasFechadas.has(m.key);
@@ -756,7 +775,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {results.length} registro{results.length === 1 ? '' : 's'} serão salvos nesta análise.
+                {visibleResults.length} registro{visibleResults.length === 1 ? "" : "s"} serão salvos nesta análise.
               </p>
             </div>
           </div>
