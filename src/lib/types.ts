@@ -33,6 +33,9 @@ export interface ExcelNfeData {
   sheetName: string;
   isFrete?: boolean;
   cfop?: string;
+  /** Valor contábil zerado — ocultada do relatório por padrão. */
+  isZerada?: boolean;
+
 }
 
 export interface Empresa {
