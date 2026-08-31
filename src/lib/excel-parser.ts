@@ -156,7 +156,34 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     return HEADER_KEYWORDS.some((kw) => t.includes(kw));
   }) ? 2 : 1);
 
+  // Fallback posicional: alguns relatórios (RFS008) rotulam a coluna de CFOP
+  // apenas como "Codificação / Fiscal". Se o cabeçalho não revelou, procuramos
+  // a coluna cujos valores sejam predominantemente códigos CFOP (4 dígitos
+  // iniciando em 1, 2, 3, 5, 6 ou 7).
+  if (colMap.cfop === -1) {
+    const sampleRows = data.slice(dataStart, dataStart + 200) as unknown[][];
+    const maxCols = sampleRows.reduce((m, r) => Math.max(m, r?.length ?? 0), 0);
+    let bestCol = -1;
+    let bestRatio = 0;
+    for (let c = 0; c < maxCols; c++) {
+      if (c === colMap.nNF || c === colMap.serie || c === colMap.valorContabil) continue;
+      let filled = 0;
+      let cfopLike = 0;
+      for (const r of sampleRows) {
+        const raw = String(r?.[c] ?? '').trim();
+        if (!raw) continue;
+        filled++;
+        if (/^[123567]\d{3}$/.test(raw.replace(/\D/g, ''))) cfopLike++;
+      }
+      if (filled < 5) continue;
+      const ratio = cfopLike / filled;
+      if (ratio > 0.7 && ratio > bestRatio) { bestRatio = ratio; bestCol = c; }
+    }
+    if (bestCol >= 0) colMap.cfop = bestCol;
+  }
+
   const results: ExcelNfeData[] = [];
+
 
   for (let i = dataStart; i < data.length; i++) {
     const row = data[i] as unknown[];
