@@ -26,6 +26,25 @@ function cnpjCompat(a: string | null | undefined, b: string | null | undefined):
 }
 
 
+/** CNPJs relevantes de um XML: emitente e destinatário (nota emitida pela própria empresa). */
+function xmlCnpjList(x: { cnpjEmitente?: string | null; cnpjDest?: string | null }): string[] {
+  return [cleanCnpj(x.cnpjEmitente ?? ''), cleanCnpj(x.cnpjDest ?? '')].filter(Boolean);
+}
+
+/** CNPJ da planilha bate com o emitente OU o destinatário do XML. */
+function cnpjMatchXml(x: { cnpjEmitente?: string | null; cnpjDest?: string | null }, rowCnpj: string | null | undefined): boolean {
+  const c = cleanCnpj(rowCnpj ?? '');
+  return !!c && xmlCnpjList(x).includes(c);
+}
+
+/** Compatível: bate com emitente/destinatário, ou um dos lados não informa CNPJ. */
+function cnpjCompatXml(x: { cnpjEmitente?: string | null; cnpjDest?: string | null }, rowCnpj: string | null | undefined): boolean {
+  const c = cleanCnpj(rowCnpj ?? '');
+  const list = xmlCnpjList(x);
+  return !c || list.length === 0 || list.includes(c);
+}
+
+
 export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
   return {
     totalPlanilha: results.filter((r) => r.valorPlanilha !== null).length,
@@ -121,7 +140,7 @@ export function reconcileMissing(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
-          cleanCnpj(xml.cnpjEmitente) === cnpjRow
+          cnpjMatchXml(xml, row.cnpjEmitente)
       );
     }
 
@@ -133,7 +152,7 @@ export function reconcileMissing(
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
           normSerie(xml.serie) === serieRow &&
-          cnpjCompat(xml.cnpjEmitente, row.cnpjEmitente)
+          cnpjCompatXml(xml, row.cnpjEmitente)
       );
     }
 
@@ -145,7 +164,7 @@ export function reconcileMissing(
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
           Math.abs(xml.vNF - planilhaVal) <= 0.01 &&
-          cnpjCompat(xml.cnpjEmitente, row.cnpjEmitente)
+          cnpjCompatXml(xml, row.cnpjEmitente)
       );
     }
 
@@ -166,7 +185,7 @@ export function reconcileMissing(
       xmlIdx = newXmlData.findIndex(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
-          cleanCnpj(xml.cnpjEmitente) === cnpjRow &&
+          cnpjMatchXml(xml, row.cnpjEmitente) &&
           Math.abs(xml.vNF - planilhaVal) <= 0.01
       );
     }
@@ -259,7 +278,7 @@ export function reconcileExcel(
         (r, idx) =>
           !usedRowIdx.has(idx) &&
           r.nNF === xmlRow.nNF &&
-          cleanCnpj(r.cnpjEmitente) === cnpjXml
+          cnpjMatchXml(xmlRow, r.cnpjEmitente)
       );
     }
 
@@ -271,7 +290,7 @@ export function reconcileExcel(
           !usedRowIdx.has(idx) &&
           r.nNF === xmlRow.nNF &&
           normSerie(r.serie) === serieXml &&
-          cnpjCompat(r.cnpjEmitente, xmlRow.cnpjEmitente)
+          cnpjCompatXml(xmlRow, r.cnpjEmitente)
       );
     }
 
@@ -284,7 +303,7 @@ export function reconcileExcel(
           r.nNF === xmlRow.nNF &&
           r.valorContabil != null &&
           Math.abs(r.valorContabil - xmlVal0) <= 0.01 &&
-          cnpjCompat(r.cnpjEmitente, xmlRow.cnpjEmitente)
+          cnpjCompatXml(xmlRow, r.cnpjEmitente)
       );
     }
 
@@ -308,7 +327,7 @@ export function reconcileExcel(
       rowIdx = newExcelRows.findIndex(
         (r, idx) =>
           !usedRowIdx.has(idx) &&
-          cleanCnpj(r.cnpjEmitente) === cnpjXml &&
+          cnpjMatchXml(xmlRow, r.cnpjEmitente) &&
           r.valorContabil != null &&
           Math.abs(r.valorContabil - xmlVal) <= 0.01
       );
@@ -397,8 +416,10 @@ export function runConfronto(
       xmlByChave.set(xml.chNFe, i);
     }
     if (xml.nNF) {
-      const key = `${xml.nNF}_${cleanCnpj(xml.cnpjEmitente ?? '')}`;
-      if (!xmlByNnfCnpj.has(key)) xmlByNnfCnpj.set(key, i);
+      for (const c of xmlCnpjList(xml)) {
+        const key = `${xml.nNF}_${c}`;
+        if (!xmlByNnfCnpj.has(key)) xmlByNnfCnpj.set(key, i);
+      }
       nnfCounts.set(xml.nNF, (nnfCounts.get(xml.nNF) ?? 0) + 1);
       const list = xmlByNnf.get(xml.nNF);
       if (list) list.push(i); else xmlByNnf.set(xml.nNF, [i]);
@@ -430,7 +451,7 @@ export function runConfronto(
         (idx) =>
           !usedXmlIdx.has(idx) &&
           normSerie(xmlData[idx].serie) === serieRow &&
-          cnpjCompat(xmlData[idx].cnpjEmitente, row.cnpjEmitente)
+          cnpjCompatXml(xmlData[idx], row.cnpjEmitente)
       );
       if (found !== undefined) matchedIdx = found;
     }
@@ -442,7 +463,7 @@ export function runConfronto(
         (idx) =>
           !usedXmlIdx.has(idx) &&
           Math.abs(xmlData[idx].vNF - row.valorContabil) <= 0.01 &&
-          cnpjCompat(xmlData[idx].cnpjEmitente, row.cnpjEmitente)
+          cnpjCompatXml(xmlData[idx], row.cnpjEmitente)
       );
       if (found !== undefined) matchedIdx = found;
     }
@@ -461,7 +482,7 @@ export function runConfronto(
       matchedIdx = xmlData.findIndex(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
-          cleanCnpj(xml.cnpjEmitente ?? '') === cnpjRow &&
+          cnpjMatchXml(xml, row.cnpjEmitente) &&
           Math.abs(xml.vNF - row.valorContabil) <= 0.01
       );
     }
