@@ -125,7 +125,32 @@ export function reconcileMissing(
       );
     }
 
+    // 2b) Match por nNF + série (relatórios sem CNPJ, ex. RFS008 Modelo A)
+    if (xmlIdx === -1 && row.nNF) {
+      const serieRow = normSerie(row.serie);
+      xmlIdx = newXmlData.findIndex(
+        (xml, idx) =>
+          !usedXmlIdx.has(idx) &&
+          xml.nNF === row.nNF &&
+          normSerie(xml.serie) === serieRow &&
+          cnpjCompat(xml.cnpjEmitente, row.cnpjEmitente)
+      );
+    }
+
+    // 2c) Match por nNF + valor aproximado
+    if (xmlIdx === -1 && row.nNF && row.valorPlanilha != null) {
+      const planilhaVal = row.valorPlanilha;
+      xmlIdx = newXmlData.findIndex(
+        (xml, idx) =>
+          !usedXmlIdx.has(idx) &&
+          xml.nNF === row.nNF &&
+          Math.abs(xml.vNF - planilhaVal) <= 0.01 &&
+          cnpjCompat(xml.cnpjEmitente, row.cnpjEmitente)
+      );
+    }
+
     // 3) Fallback: nNF apenas (somente se único no conjunto novo E a linha não tem CNPJ).
+
     // Se a linha da planilha tem CNPJ e não casou no step 2, é NF de outro emitente
     // (ex.: frete vs. produto com mesmo nº de NF) — não podemos casar só por nNF.
     if (xmlIdx === -1 && row.nNF && !row.cnpjEmitente && (nnfCounts.get(row.nNF) ?? 0) === 1) {
