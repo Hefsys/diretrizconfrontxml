@@ -210,12 +210,13 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
         competencia: saveCompetencia,
         titulo,
         fechadoPor: user.id,
-        resumo: summary,
-        resultados: results,
+        resumo: recomputeSummary(visibleResults),
+        resultados: visibleResults,
       });
       if (res.ok) {
         toast.success('Análise salva em Fechamentos');
-        exportResults(results);
+        exportResults(visibleResults);
+
         setSaveDialogOpen(false);
         navigate({ to: '/fechamentos' });
       } else {
