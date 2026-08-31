@@ -775,7 +775,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {results.length} registro{results.length === 1 ? '' : 's'} serão salvos nesta análise.
+                {visibleResults.length} registro{visibleResults.length === 1 ? "" : "s"} serão salvos nesta análise.
               </p>
             </div>
           </div>
