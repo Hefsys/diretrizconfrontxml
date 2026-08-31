@@ -557,7 +557,13 @@ export function sanitizeLegacyResults(
   input: ConfrontoResult[]
 ): { results: ConfrontoResult[]; summary: ConfrontoSummary; changed: number } {
   let changed = 0;
-  const results = input.map((r) => {
+  const results = input.map((r0) => {
+    // Marca notas zeradas (valor contábil 0) para poderem ser ocultadas.
+    let r = r0;
+    if (r.isZerada === undefined && r.valorPlanilha === 0) {
+      r = { ...r, isZerada: true };
+      changed++;
+    }
     if (r.status !== 'ausente_xml') return r;
     const cpf = isCpf(r.cnpjEmitente);
     const cfopFrete = !!(r.cfop && CFOPS_FRETE_IGNORADOS.has(r.cfop));
@@ -583,6 +589,7 @@ export function sanitizeLegacyResults(
       diferenca: 0,
     };
   });
+
   const deduped = dedupResults(results);
   return { results: deduped, summary: recomputeSummary(deduped), changed: changed + (results.length - deduped.length) };
 }
