@@ -18,11 +18,24 @@ function normSerie(v: string | null | undefined): string {
   return digits || '0';
 }
 
-/** CNPJs compatíveis: iguais, ou ao menos um dos lados sem CNPJ informado. */
-function cnpjCompat(a: string | null | undefined, b: string | null | undefined): boolean {
-  const x = cleanCnpj(a ?? '');
-  const y = cleanCnpj(b ?? '');
-  return !x || !y || x === y;
+
+
+/** CNPJs relevantes de um XML: emitente e destinatário (nota emitida pela própria empresa). */
+function xmlCnpjList(x: { cnpjEmitente?: string | null; cnpjDest?: string | null }): string[] {
+  return [cleanCnpj(x.cnpjEmitente ?? ''), cleanCnpj(x.cnpjDest ?? '')].filter(Boolean);
+}
+
+/** CNPJ da planilha bate com o emitente OU o destinatário do XML. */
+function cnpjMatchXml(x: { cnpjEmitente?: string | null; cnpjDest?: string | null }, rowCnpj: string | null | undefined): boolean {
+  const c = cleanCnpj(rowCnpj ?? '');
+  return !!c && xmlCnpjList(x).includes(c);
+}
+
+/** Compatível: bate com emitente/destinatário, ou um dos lados não informa CNPJ. */
+function cnpjCompatXml(x: { cnpjEmitente?: string | null; cnpjDest?: string | null }, rowCnpj: string | null | undefined): boolean {
+  const c = cleanCnpj(rowCnpj ?? '');
+  const list = xmlCnpjList(x);
+  return !c || list.length === 0 || list.includes(c);
 }
 
 
@@ -116,12 +129,11 @@ export function reconcileMissing(
 
     // 2) Match por nNF + CNPJ
     if (xmlIdx === -1 && row.nNF && row.cnpjEmitente) {
-      const cnpjRow = cleanCnpj(row.cnpjEmitente);
       xmlIdx = newXmlData.findIndex(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
-          cleanCnpj(xml.cnpjEmitente) === cnpjRow
+          cnpjMatchXml(xml, row.cnpjEmitente)
       );
     }
 
@@ -133,7 +145,7 @@ export function reconcileMissing(
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
           normSerie(xml.serie) === serieRow &&
-          cnpjCompat(xml.cnpjEmitente, row.cnpjEmitente)
+          cnpjCompatXml(xml, row.cnpjEmitente)
       );
     }
 
@@ -145,7 +157,7 @@ export function reconcileMissing(
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
           Math.abs(xml.vNF - planilhaVal) <= 0.01 &&
-          cnpjCompat(xml.cnpjEmitente, row.cnpjEmitente)
+          cnpjCompatXml(xml, row.cnpjEmitente)
       );
     }
 
@@ -161,12 +173,11 @@ export function reconcileMissing(
 
     // 4) Fallback: CNPJ + valor aproximado (quando não há nNF na linha)
     if (xmlIdx === -1 && (!row.nNF || row.nNF === '0') && row.cnpjEmitente && row.valorPlanilha != null) {
-      const cnpjRow = cleanCnpj(row.cnpjEmitente);
       const planilhaVal = row.valorPlanilha;
       xmlIdx = newXmlData.findIndex(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
-          cleanCnpj(xml.cnpjEmitente) === cnpjRow &&
+          cnpjMatchXml(xml, row.cnpjEmitente) &&
           Math.abs(xml.vNF - planilhaVal) <= 0.01
       );
     }
@@ -198,6 +209,7 @@ export function reconcileMissing(
       serie: xml.serie,
       data: xml.dhEmi,
       cnpjEmitente: xml.cnpjEmitente,
+      cnpjDest: xml.cnpjDest,
       nomeEmitente: xml.xNome,
       valorPlanilha: null,
       valorXml: xml.vNF,
@@ -254,12 +266,11 @@ export function reconcileExcel(
 
     // 2) nNF + CNPJ
     if (rowIdx === -1 && xmlRow.nNF && xmlRow.cnpjEmitente) {
-      const cnpjXml = cleanCnpj(xmlRow.cnpjEmitente);
       rowIdx = newExcelRows.findIndex(
         (r, idx) =>
           !usedRowIdx.has(idx) &&
           r.nNF === xmlRow.nNF &&
-          cleanCnpj(r.cnpjEmitente) === cnpjXml
+          cnpjMatchXml(xmlRow, r.cnpjEmitente)
       );
     }
 
@@ -271,7 +282,7 @@ export function reconcileExcel(
           !usedRowIdx.has(idx) &&
           r.nNF === xmlRow.nNF &&
           normSerie(r.serie) === serieXml &&
-          cnpjCompat(r.cnpjEmitente, xmlRow.cnpjEmitente)
+          cnpjCompatXml(xmlRow, r.cnpjEmitente)
       );
     }
 
@@ -284,7 +295,7 @@ export function reconcileExcel(
           r.nNF === xmlRow.nNF &&
           r.valorContabil != null &&
           Math.abs(r.valorContabil - xmlVal0) <= 0.01 &&
-          cnpjCompat(r.cnpjEmitente, xmlRow.cnpjEmitente)
+          cnpjCompatXml(xmlRow, r.cnpjEmitente)
       );
     }
 
@@ -303,12 +314,11 @@ export function reconcileExcel(
       xmlRow.cnpjEmitente &&
       xmlRow.valorXml != null
     ) {
-      const cnpjXml = cleanCnpj(xmlRow.cnpjEmitente);
       const xmlVal = xmlRow.valorXml;
       rowIdx = newExcelRows.findIndex(
         (r, idx) =>
           !usedRowIdx.has(idx) &&
-          cleanCnpj(r.cnpjEmitente) === cnpjXml &&
+          cnpjMatchXml(xmlRow, r.cnpjEmitente) &&
           r.valorContabil != null &&
           Math.abs(r.valorContabil - xmlVal) <= 0.01
       );
@@ -397,8 +407,10 @@ export function runConfronto(
       xmlByChave.set(xml.chNFe, i);
     }
     if (xml.nNF) {
-      const key = `${xml.nNF}_${cleanCnpj(xml.cnpjEmitente ?? '')}`;
-      if (!xmlByNnfCnpj.has(key)) xmlByNnfCnpj.set(key, i);
+      for (const c of xmlCnpjList(xml)) {
+        const key = `${xml.nNF}_${c}`;
+        if (!xmlByNnfCnpj.has(key)) xmlByNnfCnpj.set(key, i);
+      }
       nnfCounts.set(xml.nNF, (nnfCounts.get(xml.nNF) ?? 0) + 1);
       const list = xmlByNnf.get(xml.nNF);
       if (list) list.push(i); else xmlByNnf.set(xml.nNF, [i]);
@@ -430,7 +442,7 @@ export function runConfronto(
         (idx) =>
           !usedXmlIdx.has(idx) &&
           normSerie(xmlData[idx].serie) === serieRow &&
-          cnpjCompat(xmlData[idx].cnpjEmitente, row.cnpjEmitente)
+          cnpjCompatXml(xmlData[idx], row.cnpjEmitente)
       );
       if (found !== undefined) matchedIdx = found;
     }
@@ -442,7 +454,7 @@ export function runConfronto(
         (idx) =>
           !usedXmlIdx.has(idx) &&
           Math.abs(xmlData[idx].vNF - row.valorContabil) <= 0.01 &&
-          cnpjCompat(xmlData[idx].cnpjEmitente, row.cnpjEmitente)
+          cnpjCompatXml(xmlData[idx], row.cnpjEmitente)
       );
       if (found !== undefined) matchedIdx = found;
     }
@@ -457,11 +469,10 @@ export function runConfronto(
 
     // 4) Fallback: CNPJ + valor aproximado (linhas sem nNF)
     if (matchedIdx === -1 && (!row.nNF || row.nNF === '0') && row.cnpjEmitente && row.valorContabil != null) {
-      const cnpjRow = cleanCnpj(row.cnpjEmitente);
       matchedIdx = xmlData.findIndex(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
-          cleanCnpj(xml.cnpjEmitente ?? '') === cnpjRow &&
+          cnpjMatchXml(xml, row.cnpjEmitente) &&
           Math.abs(xml.vNF - row.valorContabil) <= 0.01
       );
     }
@@ -525,6 +536,7 @@ export function runConfronto(
       serie: xml.serie,
       data: xml.dhEmi,
       cnpjEmitente: xml.cnpjEmitente,
+      cnpjDest: xml.cnpjDest,
       nomeEmitente: xml.xNome,
       valorPlanilha: null,
       valorXml: xml.vNF,

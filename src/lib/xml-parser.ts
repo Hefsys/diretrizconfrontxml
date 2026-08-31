@@ -46,12 +46,14 @@ export function parseXmlNfe(xmlString: string): XmlNfeData | null {
 
     const ide = doc.getElementsByTagName('ide')[0];
     const emit = doc.getElementsByTagName('emit')[0];
+    const dest = doc.getElementsByTagName('dest')[0];
     const icmsTot = doc.getElementsByTagName('ICMSTot')[0];
 
     const nNF = getText(ide, 'nNF');
     const serie = getText(ide, 'serie');
     const dhEmi = getText(ide, 'dhEmi') || getText(ide, 'dEmi');
     const cnpjEmitente = getText(emit, 'CNPJ');
+    const cnpjDest = getText(dest, 'CNPJ') || getText(dest, 'CPF');
     const xNome = getText(emit, 'xNome');
 
     return {
@@ -60,6 +62,7 @@ export function parseXmlNfe(xmlString: string): XmlNfeData | null {
       serie,
       dhEmi,
       cnpjEmitente,
+      cnpjDest,
       xNome,
       vNF: getNumber(icmsTot, 'vNF'),
       vBC: getNumber(icmsTot, 'vBC'),

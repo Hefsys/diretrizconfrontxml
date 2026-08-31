@@ -4,6 +4,8 @@ export interface XmlNfeData {
   serie: string;
   dhEmi: string;
   cnpjEmitente: string;
+  /** CNPJ do destinatário — usado para casar notas emitidas pela própria empresa. */
+  cnpjDest?: string;
   xNome: string;
   vNF: number;
   vBC: number;
@@ -73,6 +75,8 @@ export interface ConfrontoResult {
   serie: string;
   data: string;
   cnpjEmitente: string;
+  /** CNPJ do destinatário do XML casado (notas emitidas pela própria empresa). */
+  cnpjDest?: string;
   nomeEmitente: string;
   valorPlanilha: number | null;
   valorXml: number | null;
