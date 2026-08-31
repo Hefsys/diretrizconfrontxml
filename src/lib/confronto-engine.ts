@@ -388,6 +388,7 @@ export function runConfronto(
   // Build XML lookup structures (CNPJ sempre normalizado nos dois lados)
   const xmlByChave = new Map<string, number>();
   const xmlByNnfCnpj = new Map<string, number>();
+  const xmlByNnf = new Map<string, number[]>();
   const nnfCounts = new Map<string, number>();
 
   for (let i = 0; i < xmlData.length; i++) {
@@ -399,6 +400,8 @@ export function runConfronto(
       const key = `${xml.nNF}_${cleanCnpj(xml.cnpjEmitente ?? '')}`;
       if (!xmlByNnfCnpj.has(key)) xmlByNnfCnpj.set(key, i);
       nnfCounts.set(xml.nNF, (nnfCounts.get(xml.nNF) ?? 0) + 1);
+      const list = xmlByNnf.get(xml.nNF);
+      if (list) list.push(i); else xmlByNnf.set(xml.nNF, [i]);
     }
   }
 
@@ -419,6 +422,31 @@ export function runConfronto(
       if (idx !== undefined && !usedXmlIdx.has(idx)) matchedIdx = idx;
     }
 
+    // 2b) Match por nNF + série (relatórios sem CNPJ, ex. RFS008 Modelo A)
+    if (matchedIdx === -1 && row.nNF) {
+      const serieRow = normSerie(row.serie);
+      const cand = xmlByNnf.get(row.nNF) ?? [];
+      const found = cand.find(
+        (idx) =>
+          !usedXmlIdx.has(idx) &&
+          normSerie(xmlData[idx].serie) === serieRow &&
+          cnpjCompat(xmlData[idx].cnpjEmitente, row.cnpjEmitente)
+      );
+      if (found !== undefined) matchedIdx = found;
+    }
+
+    // 2c) Match por nNF + valor aproximado
+    if (matchedIdx === -1 && row.nNF && row.valorContabil != null) {
+      const cand = xmlByNnf.get(row.nNF) ?? [];
+      const found = cand.find(
+        (idx) =>
+          !usedXmlIdx.has(idx) &&
+          Math.abs(xmlData[idx].vNF - row.valorContabil) <= 0.01 &&
+          cnpjCompat(xmlData[idx].cnpjEmitente, row.cnpjEmitente)
+      );
+      if (found !== undefined) matchedIdx = found;
+    }
+
     // 3) Fallback: nNF apenas — só quando a linha da planilha não tem CNPJ.
     // Evita casar linhas de frete (transportadora) com XML de produto de mesmo nNF.
     if (matchedIdx === -1 && row.nNF && !row.cnpjEmitente && (nnfCounts.get(row.nNF) ?? 0) === 1) {
@@ -437,6 +465,7 @@ export function runConfronto(
           Math.abs(xml.vNF - row.valorContabil) <= 0.01
       );
     }
+
 
     const matchedXml = matchedIdx >= 0 ? xmlData[matchedIdx] : undefined;
 
