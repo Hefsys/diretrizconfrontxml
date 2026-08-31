@@ -509,7 +509,9 @@ export function runConfronto(
         sheetName: row.sheetName,
         cfop: row.cfop,
         isFrete: row.isFrete,
+        isZerada: row.isZerada ?? valorPlanilha === 0,
       });
+
     }
   }
 
