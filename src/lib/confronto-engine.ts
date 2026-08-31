@@ -263,7 +263,33 @@ export function reconcileExcel(
       );
     }
 
+    // 2b) nNF + série
+    if (rowIdx === -1 && xmlRow.nNF) {
+      const serieXml = normSerie(xmlRow.serie);
+      rowIdx = newExcelRows.findIndex(
+        (r, idx) =>
+          !usedRowIdx.has(idx) &&
+          r.nNF === xmlRow.nNF &&
+          normSerie(r.serie) === serieXml &&
+          cnpjCompat(r.cnpjEmitente, xmlRow.cnpjEmitente)
+      );
+    }
+
+    // 2c) nNF + valor aproximado
+    if (rowIdx === -1 && xmlRow.nNF && xmlRow.valorXml != null) {
+      const xmlVal0 = xmlRow.valorXml;
+      rowIdx = newExcelRows.findIndex(
+        (r, idx) =>
+          !usedRowIdx.has(idx) &&
+          r.nNF === xmlRow.nNF &&
+          r.valorContabil != null &&
+          Math.abs(r.valorContabil - xmlVal0) <= 0.01 &&
+          cnpjCompat(r.cnpjEmitente, xmlRow.cnpjEmitente)
+      );
+    }
+
     // 3) nNF único — só quando a linha do XML não tem CNPJ para desambiguar
+
     if (rowIdx === -1 && xmlRow.nNF && !xmlRow.cnpjEmitente && (nnfCounts.get(xmlRow.nNF) ?? 0) === 1) {
       rowIdx = newExcelRows.findIndex(
         (r, idx) => !usedRowIdx.has(idx) && r.nNF === xmlRow.nNF
