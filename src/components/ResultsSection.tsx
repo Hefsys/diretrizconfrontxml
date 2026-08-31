@@ -521,7 +521,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
                 : 'border-border bg-background text-foreground hover:bg-muted'
             }`}
           >
-            Todos ({results.length})
+            Todos ({visibleResults.length})
           </button>
           {monthsAvailable.map((m) => {
             const closed = competenciasFechadas.has(m.key);
