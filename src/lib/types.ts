@@ -4,6 +4,8 @@ export interface XmlNfeData {
   serie: string;
   dhEmi: string;
   cnpjEmitente: string;
+  /** CNPJ do destinatário — usado para casar notas emitidas pela própria empresa. */
+  cnpjDest?: string;
   xNome: string;
   vNF: number;
   vBC: number;
