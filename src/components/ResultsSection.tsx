@@ -160,7 +160,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
 
   useEffect(() => {
     setPage(0);
-  }, [filter, searchNf, selectedMonth, pageSize]);
+  }, [filter, searchNf, selectedMonth, pageSize, showZeradas]);
 
 
   // Competências válidas para escolher como rótulo da análise (exclui "sem-data")
