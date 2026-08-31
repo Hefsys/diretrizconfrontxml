@@ -25,7 +25,7 @@ import {
 import { Label } from '@/components/ui/label';
 import type { ConfrontoResult, ConfrontoSummary, ConfrontoStatus } from '@/lib/types';
 import { exportResults } from '@/lib/export-excel';
-import { getMonthKey } from '@/lib/confronto-engine';
+import { getMonthKey, recomputeSummary } from '@/lib/confronto-engine';
 import { fecharMes } from '@/lib/fechamentos';
 import { useAuth } from '@/hooks/useAuth';
 
