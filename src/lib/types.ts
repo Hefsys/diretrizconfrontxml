@@ -75,6 +75,8 @@ export interface ConfrontoResult {
   serie: string;
   data: string;
   cnpjEmitente: string;
+  /** CNPJ do destinatário do XML casado (notas emitidas pela própria empresa). */
+  cnpjDest?: string;
   nomeEmitente: string;
   valorPlanilha: number | null;
   valorXml: number | null;

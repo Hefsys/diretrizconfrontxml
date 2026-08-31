@@ -135,7 +135,6 @@ export function reconcileMissing(
 
     // 2) Match por nNF + CNPJ
     if (xmlIdx === -1 && row.nNF && row.cnpjEmitente) {
-      const cnpjRow = cleanCnpj(row.cnpjEmitente);
       xmlIdx = newXmlData.findIndex(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
@@ -180,7 +179,6 @@ export function reconcileMissing(
 
     // 4) Fallback: CNPJ + valor aproximado (quando não há nNF na linha)
     if (xmlIdx === -1 && (!row.nNF || row.nNF === '0') && row.cnpjEmitente && row.valorPlanilha != null) {
-      const cnpjRow = cleanCnpj(row.cnpjEmitente);
       const planilhaVal = row.valorPlanilha;
       xmlIdx = newXmlData.findIndex(
         (xml, idx) =>
@@ -217,6 +215,7 @@ export function reconcileMissing(
       serie: xml.serie,
       data: xml.dhEmi,
       cnpjEmitente: xml.cnpjEmitente,
+      cnpjDest: xml.cnpjDest,
       nomeEmitente: xml.xNome,
       valorPlanilha: null,
       valorXml: xml.vNF,
@@ -273,7 +272,6 @@ export function reconcileExcel(
 
     // 2) nNF + CNPJ
     if (rowIdx === -1 && xmlRow.nNF && xmlRow.cnpjEmitente) {
-      const cnpjXml = cleanCnpj(xmlRow.cnpjEmitente);
       rowIdx = newExcelRows.findIndex(
         (r, idx) =>
           !usedRowIdx.has(idx) &&
@@ -322,7 +320,6 @@ export function reconcileExcel(
       xmlRow.cnpjEmitente &&
       xmlRow.valorXml != null
     ) {
-      const cnpjXml = cleanCnpj(xmlRow.cnpjEmitente);
       const xmlVal = xmlRow.valorXml;
       rowIdx = newExcelRows.findIndex(
         (r, idx) =>
@@ -478,7 +475,6 @@ export function runConfronto(
 
     // 4) Fallback: CNPJ + valor aproximado (linhas sem nNF)
     if (matchedIdx === -1 && (!row.nNF || row.nNF === '0') && row.cnpjEmitente && row.valorContabil != null) {
-      const cnpjRow = cleanCnpj(row.cnpjEmitente);
       matchedIdx = xmlData.findIndex(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
@@ -546,6 +542,7 @@ export function runConfronto(
       serie: xml.serie,
       data: xml.dhEmi,
       cnpjEmitente: xml.cnpjEmitente,
+      cnpjDest: xml.cnpjDest,
       nomeEmitente: xml.xNome,
       valorPlanilha: null,
       valorXml: xml.vNF,

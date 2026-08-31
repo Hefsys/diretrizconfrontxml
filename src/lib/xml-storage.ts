@@ -37,7 +37,7 @@ export async function salvarXmls(
   const { data, error } = await supabase
     .from('xmls_armazenados')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .upsert(rows as any, { onConflict: 'empresa_id,ch_nfe', ignoreDuplicates: true })
+    .upsert(rows as any, { onConflict: 'empresa_id,ch_nfe', ignoreDuplicates: false })
     .select('id');
 
   if (error) {
