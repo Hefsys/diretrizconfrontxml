@@ -487,7 +487,9 @@ export function runConfronto(
         sheetName: row.sheetName,
         cfop: row.cfop,
         isFrete: row.isFrete,
+        isZerada: row.isZerada ?? valorPlanilha === 0,
       });
+
     } else {
       const cpf = isCpf(row.cnpjEmitente);
       const ajuste = isAjusteZerado(row.cfop, row.valorContabil);
