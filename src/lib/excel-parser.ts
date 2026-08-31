@@ -98,7 +98,14 @@ function mapColumns(headerRow: unknown[]): ColumnMap {
   headerRow.forEach((cell, idx) => {
     const t = cell ? normalizeStr(String(cell)) : '';
     if (t.includes('chave') || t.includes('chnfe')) map.chNFe = idx;
-    else if (t.includes('cfop') || t.includes('c.f.o.p')) map.cfop = idx;
+    else if (
+      t.includes('cfop') || t.includes('c.f.o.p') ||
+      t === 'fiscal' || t === 'cod. fiscal' || t === 'cod fiscal' ||
+      t.includes('codificacao fiscal')
+    ) {
+      if (map.cfop === -1) map.cfop = idx;
+    }
+
     else if (t.includes('numero') || t.includes('nº') || t.includes('n°') || t === 'nf') map.nNF = idx;
     else if (t.includes('serie') || t.includes('sub')) {
       if (map.serie === -1) map.serie = idx;
