@@ -12,6 +12,20 @@ function isCpf(v: string | null | undefined): boolean {
   return cleanCnpj(v ?? '').length === 11;
 }
 
+/** Normaliza a série ("069 " → "69", "" → "0") para comparação. */
+function normSerie(v: string | null | undefined): string {
+  const digits = String(v ?? '').replace(/\D/g, '').replace(/^0+/, '');
+  return digits || '0';
+}
+
+/** CNPJs compatíveis: iguais, ou ao menos um dos lados sem CNPJ informado. */
+function cnpjCompat(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = cleanCnpj(a ?? '');
+  const y = cleanCnpj(b ?? '');
+  return !x || !y || x === y;
+}
+
+
 export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
   return {
     totalPlanilha: results.filter((r) => r.valorPlanilha !== null).length,
