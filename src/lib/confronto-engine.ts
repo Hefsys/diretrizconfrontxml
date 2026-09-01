@@ -38,6 +38,17 @@ function cnpjCompatXml(x: { cnpjEmitente?: string | null; cnpjDest?: string | nu
   return !c || list.length === 0 || list.includes(c);
 }
 
+/**
+ * Compatibilidade "frouxa": além do compat normal, aceita quando o XML não tem
+ * o CNPJ do destinatário gravado (XMLs importados antes da leitura do <dest>).
+ * Nesses casos o CNPJ da planilha pode ser o do destinatário — não podemos
+ * usar a divergência com o emitente para bloquear o casamento.
+ */
+function cnpjLooseXml(x: { cnpjEmitente?: string | null; cnpjDest?: string | null }, rowCnpj: string | null | undefined): boolean {
+  return cnpjCompatXml(x, rowCnpj) || !cleanCnpj(x.cnpjDest ?? '');
+}
+
+
 
 export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
   return {
@@ -145,7 +156,7 @@ export function reconcileMissing(
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
           normSerie(xml.serie) === serieRow &&
-          cnpjCompatXml(xml, row.cnpjEmitente)
+          cnpjLooseXml(xml, row.cnpjEmitente)
       );
     }
 
@@ -156,8 +167,7 @@ export function reconcileMissing(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
-          Math.abs(xml.vNF - planilhaVal) <= 0.01 &&
-          cnpjCompatXml(xml, row.cnpjEmitente)
+          Math.abs(xml.vNF - planilhaVal) <= 0.01
       );
     }
 
@@ -282,7 +292,7 @@ export function reconcileExcel(
           !usedRowIdx.has(idx) &&
           r.nNF === xmlRow.nNF &&
           normSerie(r.serie) === serieXml &&
-          cnpjCompatXml(xmlRow, r.cnpjEmitente)
+          cnpjLooseXml(xmlRow, r.cnpjEmitente)
       );
     }
 
@@ -294,8 +304,7 @@ export function reconcileExcel(
           !usedRowIdx.has(idx) &&
           r.nNF === xmlRow.nNF &&
           r.valorContabil != null &&
-          Math.abs(r.valorContabil - xmlVal0) <= 0.01 &&
-          cnpjCompatXml(xmlRow, r.cnpjEmitente)
+          Math.abs(r.valorContabil - xmlVal0) <= 0.01
       );
     }
 
@@ -442,7 +451,7 @@ export function runConfronto(
         (idx) =>
           !usedXmlIdx.has(idx) &&
           normSerie(xmlData[idx].serie) === serieRow &&
-          cnpjCompatXml(xmlData[idx], row.cnpjEmitente)
+          cnpjLooseXml(xmlData[idx], row.cnpjEmitente)
       );
       if (found !== undefined) matchedIdx = found;
     }
@@ -453,8 +462,7 @@ export function runConfronto(
       const found = cand.find(
         (idx) =>
           !usedXmlIdx.has(idx) &&
-          Math.abs(xmlData[idx].vNF - row.valorContabil) <= 0.01 &&
-          cnpjCompatXml(xmlData[idx], row.cnpjEmitente)
+          Math.abs(xmlData[idx].vNF - row.valorContabil) <= 0.01
       );
       if (found !== undefined) matchedIdx = found;
     }
