@@ -12,7 +12,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { LogOut, Database, Trash2, Search } from 'lucide-react';
+import { LogOut, Database, Trash2, Search, RefreshCw } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ExcelBaseSection } from '@/components/ExcelBaseSection';
@@ -313,6 +313,35 @@ function XmlsPage() {
           </TabsList>
 
           <TabsContent value="xmls" className="space-y-4 mt-0">
+          <Card className="p-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Reprocessar XMLs</p>
+              <p className="text-xs text-muted-foreground">
+                Reenvie os arquivos do mês para atualizar os registros já salvos (inclui o CNPJ do destinatário, usado nas notas de garantia).
+              </p>
+            </div>
+            <label className="inline-flex">
+              <input
+                type="file"
+                accept=".xml"
+                multiple
+                className="hidden"
+                disabled={reprocessando || !empresaId}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  e.target.value = '';
+                  void reprocessarXmls(files);
+                }}
+              />
+              <Button asChild variant="outline" disabled={reprocessando || !empresaId}>
+                <span className="cursor-pointer">
+                  <RefreshCw className={`h-4 w-4 mr-2 ${reprocessando ? 'animate-spin' : ''}`} />
+                  {reprocessando ? 'Reprocessando...' : 'Selecionar XMLs'}
+                </span>
+              </Button>
+            </label>
+          </Card>
+
           <Card className="p-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div className="relative md:col-span-2">
