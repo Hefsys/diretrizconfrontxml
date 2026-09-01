@@ -48,13 +48,34 @@ export async function salvarXmls(
 }
 
 /**
- * Carrega todos os XMLs já armazenados para uma empresa.
+ * IDs das empresas do mesmo grupo (mesma raiz de CNPJ — 8 primeiros dígitos).
+ * Garante que XMLs subidos na matriz/filial errada ainda sejam encontrados.
+ */
+async function idsDoGrupo(empresaId: string): Promise<string[]> {
+  const { data: emp } = await supabase
+    .from('empresas')
+    .select('cnpj')
+    .eq('id', empresaId)
+    .maybeSingle();
+  const raiz = cleanCnpj(emp?.cnpj ?? '').slice(0, 8);
+  if (raiz.length !== 8) return [empresaId];
+  const { data } = await supabase.from('empresas').select('id, cnpj');
+  const ids = (data ?? [])
+    .filter((e) => cleanCnpj(e.cnpj ?? '').slice(0, 8) === raiz)
+    .map((e) => e.id);
+  return ids.length > 0 ? ids : [empresaId];
+}
+
+/**
+ * Carrega todos os XMLs armazenados para uma empresa (e demais filiais do
+ * mesmo CNPJ raiz).
  */
 export async function carregarXmlsDaEmpresa(empresaId: string): Promise<XmlNfeData[]> {
+  const ids = await idsDoGrupo(empresaId);
   const { data, error } = await supabase
     .from('xmls_armazenados')
     .select('xml_data')
-    .eq('empresa_id', empresaId);
+    .in('empresa_id', ids);
 
   if (error || !data) {
     console.error('Erro ao carregar XMLs:', error);
@@ -62,6 +83,7 @@ export async function carregarXmlsDaEmpresa(empresaId: string): Promise<XmlNfeDa
   }
   return data.map((r) => r.xml_data as unknown as XmlNfeData);
 }
+
 
 /**
  * Mescla duas listas de XMLs eliminando duplicatas pela chave NF-e.
