@@ -223,6 +223,31 @@ function XmlsPage() {
 
   useEffect(() => { setSelected(new Set()); }, [empresaId]);
 
+  const [reprocessando, setReprocessando] = useState(false);
+
+  const reprocessarXmls = async (files: File[]) => {
+    if (!user || !empresaId || files.length === 0) return;
+    setReprocessando(true);
+    try {
+      const { parseXmlFiles } = await import('@/lib/xml-parser');
+      const { salvarXmls } = await import('@/lib/xml-storage');
+      const parsed = await parseXmlFiles(files);
+      if (parsed.length === 0) {
+        toast.error('Nenhum XML válido encontrado nos arquivos enviados');
+        return;
+      }
+      const n = await salvarXmls(empresaId, user.id, parsed);
+      toast.success(`${n} XML(s) reprocessado(s) — dados atualizados na base`);
+      await carregarXmls(empresaId);
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao reprocessar XMLs');
+    } finally {
+      setReprocessando(false);
+    }
+  };
+
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
