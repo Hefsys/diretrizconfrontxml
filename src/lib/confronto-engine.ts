@@ -38,6 +38,17 @@ function cnpjCompatXml(x: { cnpjEmitente?: string | null; cnpjDest?: string | nu
   return !c || list.length === 0 || list.includes(c);
 }
 
+/**
+ * Compatibilidade "frouxa": além do compat normal, aceita quando o XML não tem
+ * o CNPJ do destinatário gravado (XMLs importados antes da leitura do <dest>).
+ * Nesses casos o CNPJ da planilha pode ser o do destinatário — não podemos
+ * usar a divergência com o emitente para bloquear o casamento.
+ */
+function cnpjLooseXml(x: { cnpjEmitente?: string | null; cnpjDest?: string | null }, rowCnpj: string | null | undefined): boolean {
+  return cnpjCompatXml(x, rowCnpj) || !cleanCnpj(x.cnpjDest ?? '');
+}
+
+
 
 export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
   return {
