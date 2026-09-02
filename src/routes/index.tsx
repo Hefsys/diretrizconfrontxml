@@ -169,7 +169,7 @@ function Index() {
       {headerEl}
       <main className="p-6">
         {view === 'upload' ? (
-          <UploadComp onProcess={handleProcess} isProcessing={isProcessing} />
+          <UploadComp onProcess={handleProcess} isProcessing={isProcessing} progressLabel={progressLabel} />
         ) : summary ? (
           <ResultsComp results={results} summary={summary} onReset={handleReset} empresaId={empresaId} />
         ) : null}
