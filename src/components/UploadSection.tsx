@@ -16,9 +16,10 @@ interface EmpresaOpt {
 interface UploadSectionProps {
   onProcess: (xmlFiles: File[], workbook: WorkBook | null, selectedSheets: string[], empresaId: string) => void;
   isProcessing: boolean;
+  progressLabel?: string;
 }
 
-export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
+export function UploadSection({ onProcess, isProcessing, progressLabel }: UploadSectionProps) {
   const [xmlFiles, setXmlFiles] = useState<File[]>([]);
   const [workbook, setWorkbook] = useState<WorkBook | null>(null);
   const [excelFileName, setExcelFileName] = useState('');
@@ -26,6 +27,8 @@ export function UploadSection({ onProcess, isProcessing }: UploadSectionProps) {
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
   const [empresas, setEmpresas] = useState<EmpresaOpt[]>([]);
   const [empresaId, setEmpresaId] = useState<string>('');
+  const [readingExcel, setReadingExcel] = useState(false);
+  const [excelError, setExcelError] = useState('');
   const xmlInputRef = useRef<HTMLInputElement>(null);
   const xmlFolderInputRef = useRef<HTMLInputElement>(null);
   const excelInputRef = useRef<HTMLInputElement>(null);
