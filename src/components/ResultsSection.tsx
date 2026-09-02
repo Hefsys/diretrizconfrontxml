@@ -94,6 +94,8 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
 
   const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
   const [isAddingXmls, setIsAddingXmls] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
+  const [progressMsg, setProgressMsg] = useState<string | null>(null);
   const [isAddingExcel, setIsAddingExcel] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [competenciasFechadas] = useState<Set<string>>(new Set());
