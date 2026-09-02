@@ -80,14 +80,32 @@ export function parseXmlNfe(xmlString: string): XmlNfeData | null {
   }
 }
 
-export async function parseXmlFiles(files: File[]): Promise<XmlNfeData[]> {
+/**
+ * Lê e interpreta os XMLs com concorrência limitada, cedendo a thread a cada
+ * lote para a interface continuar respondendo em uploads grandes.
+ */
+export async function parseXmlFiles(
+  files: File[],
+  onProgress?: (lidos: number, total: number) => void
+): Promise<XmlNfeData[]> {
   const results: XmlNfeData[] = [];
-  for (const file of files) {
-    const text = await file.text();
-    const parsed = parseXmlNfe(text);
-    if (parsed && parsed.nNF) {
-      results.push(parsed);
+  const LOTE = 25;
+  for (let i = 0; i < files.length; i += LOTE) {
+    const lote = files.slice(i, i + LOTE);
+    const parsed = await Promise.all(
+      lote.map(async (file) => {
+        try {
+          return parseXmlNfe(await file.text());
+        } catch {
+          return null;
+        }
+      })
+    );
+    for (const p of parsed) {
+      if (p && p.nNF) results.push(p);
     }
+    onProgress?.(Math.min(i + lote.length, files.length), files.length);
+    await new Promise((r) => setTimeout(r, 0));
   }
   return results;
 }
