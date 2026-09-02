@@ -57,27 +57,30 @@ const MONTH_NAMES_PT = [
 ];
 
 function formatMonthLabel(key: string): string {
-  if (key === 'sem-data') return 'Sem data';
-  const [year, month] = key.split('-');
-  const idx = parseInt(month, 10) - 1;
-  if (idx < 0 || idx > 11) return key;
+  if (!key || key === 'sem-data') return 'Sem data';
+  const [year, month] = String(key).split('-');
+  const idx = parseInt(month ?? '', 10) - 1;
+  if (!Number.isFinite(idx) || idx < 0 || idx > 11) return key;
   return `${MONTH_NAMES_PT[idx]}/${year}`;
 }
 
-function formatCurrency(v: number | null): string {
-  if (v === null) return '—';
+
+function formatCurrency(v: number | null | undefined): string {
+  if (v === null || v === undefined || typeof v !== 'number' || !Number.isFinite(v)) return '—';
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function formatCnpj(v: string): string {
-  if (v.length === 14) {
-    return v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+function formatCnpj(v: string | null | undefined): string {
+  const s = String(v ?? '');
+  if (s.length === 14) {
+    return s.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
   }
-  if (v.length === 11) {
-    return v.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+  if (s.length === 11) {
+    return s.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
   }
-  return v;
+  return s;
 }
+
 
 export function ResultsSection({ results: initialResults, summary: initialSummary, onReset, empresaId, readOnly = false, resetLabel, onUpdate }: ResultsSectionProps) {
   const { user } = useAuth();
@@ -407,7 +410,8 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
   const showDropzone = canEditXmls && selectedMonth !== 'todos' && summaryForMonth.ausentes > 0;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 notranslate" translate="no">
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
