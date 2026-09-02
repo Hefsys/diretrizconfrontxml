@@ -243,6 +243,7 @@ export type Database = {
           serie: string | null
           updated_at: string
           uploaded_by: string | null
+          v_escriturado: number | null
           v_ipi: number | null
           v_nf: number | null
           x_nome: string | null
@@ -261,6 +262,7 @@ export type Database = {
           serie?: string | null
           updated_at?: string
           uploaded_by?: string | null
+          v_escriturado?: number | null
           v_ipi?: number | null
           v_nf?: number | null
           x_nome?: string | null
@@ -279,6 +281,7 @@ export type Database = {
           serie?: string | null
           updated_at?: string
           uploaded_by?: string | null
+          v_escriturado?: number | null
           v_ipi?: number | null
           v_nf?: number | null
           x_nome?: string | null

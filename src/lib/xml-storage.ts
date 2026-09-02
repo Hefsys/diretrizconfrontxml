@@ -32,6 +32,8 @@ export async function salvarXmls(
       x_nome: x.xNome,
       v_nf: x.vNF,
       v_ipi: x.vIPI,
+      v_escriturado: x.vEscriturado ?? null,
+
       cancelada: x.cancelada,
       xml_data: x as unknown as Record<string, unknown>,
       uploaded_by: uploadedBy,
@@ -79,7 +81,7 @@ async function idsDoGrupo(empresaId: string): Promise<string[]> {
   return ids.length > 0 ? ids : [empresaId];
 }
 
-const SLIM_COLS = 'ch_nfe, n_nf, serie, dh_emi, cnpj_emitente, cnpj_dest, x_nome, v_nf, v_ipi, cancelada';
+const SLIM_COLS = 'ch_nfe, n_nf, serie, dh_emi, cnpj_emitente, cnpj_dest, x_nome, v_nf, v_ipi, v_escriturado, cancelada';
 
 interface SlimRow {
   ch_nfe: string | null;
@@ -91,6 +93,7 @@ interface SlimRow {
   x_nome: string | null;
   v_nf: number | null;
   v_ipi: number | null;
+  v_escriturado?: number | null;
   cancelada: boolean | null;
 }
 
@@ -112,9 +115,11 @@ function toXmlNfe(r: SlimRow): XmlNfeData {
     vPIS: 0,
     vCOFINS: 0,
     vProd: 0,
+    vEscriturado: r.v_escriturado == null ? undefined : Number(r.v_escriturado),
     cancelada: !!r.cancelada,
   };
 }
+
 
 const PAGE = 1000;
 const CONCURRENCY = 4;

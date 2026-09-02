@@ -1,0 +1,1 @@
+ALTER TABLE public.xmls_armazenados ADD COLUMN IF NOT EXISTS v_escriturado numeric;

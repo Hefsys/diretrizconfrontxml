@@ -56,6 +56,18 @@ export function parseXmlNfe(xmlString: string): XmlNfeData | null {
     const cnpjDest = getText(dest, 'CNPJ') || getText(dest, 'CPF');
     const xNome = getText(emit, 'xNome');
 
+    const vNF = getNumber(icmsTot, 'vNF');
+    const vProd = getNumber(icmsTot, 'vProd');
+    const vST = getNumber(icmsTot, 'vST');
+    const vIPI = getNumber(icmsTot, 'vIPI');
+    const vFrete = getNumber(icmsTot, 'vFrete');
+    const vSeguro = getNumber(icmsTot, 'vSeg');
+    const vOutro = getNumber(icmsTot, 'vOutro');
+    const vDesc = getNumber(icmsTot, 'vDesc');
+    // Valor escriturado (Valor Contábil do Dealernet): não inclui despesas
+    // acessórias que algumas notas somam ao vNF (PIS ST / COFINS ST).
+    const vEscriturado = vProd + vFrete + vSeguro + vOutro - vDesc + vST + vIPI;
+
     return {
       chNFe,
       nNF,
@@ -64,17 +76,23 @@ export function parseXmlNfe(xmlString: string): XmlNfeData | null {
       cnpjEmitente,
       cnpjDest,
       xNome,
-      vNF: getNumber(icmsTot, 'vNF'),
+      vNF,
       vBC: getNumber(icmsTot, 'vBC'),
       vICMS: getNumber(icmsTot, 'vICMS'),
       vBCST: getNumber(icmsTot, 'vBCST'),
-      vST: getNumber(icmsTot, 'vST'),
-      vIPI: getNumber(icmsTot, 'vIPI'),
+      vST,
+      vIPI,
       vPIS: getNumber(icmsTot, 'vPIS'),
       vCOFINS: getNumber(icmsTot, 'vCOFINS'),
-      vProd: getNumber(icmsTot, 'vProd'),
+      vProd,
+      vFrete,
+      vSeguro,
+      vOutro,
+      vDesc,
+      vEscriturado: vProd > 0 ? vEscriturado : undefined,
       cancelada: isXmlCancelada(doc),
     };
+
   } catch {
     return null;
   }
