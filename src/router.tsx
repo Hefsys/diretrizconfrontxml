@@ -3,6 +3,8 @@ import { routeTree } from "./routeTree.gen";
 
 function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
+  console.error("[app] erro de renderização:", error);
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
