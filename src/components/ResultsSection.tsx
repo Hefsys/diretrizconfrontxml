@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Plus, Trash2, Loader2, Upload, CalendarDays, Search, Lock, Save } from 'lucide-react';
+import { Plus, Trash2, Loader2, Upload, CalendarDays, Search, Lock, Save, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -94,6 +94,8 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
 
   const [deleteIdx, setDeleteIdx] = useState<number | null>(null);
   const [isAddingXmls, setIsAddingXmls] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
+  const [progressMsg, setProgressMsg] = useState<string | null>(null);
   const [isAddingExcel, setIsAddingExcel] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [competenciasFechadas] = useState<Set<string>>(new Set());
@@ -241,32 +243,43 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
 
   const handleAddXmlsClick = () => fileInputRef.current?.click();
 
+  const monthFilterFn = () =>
+    selectedMonth === 'todos'
+      ? undefined
+      : (row: ConfrontoResult) => {
+          const k = getMonthKey(row.data);
+          return k === selectedMonth || k === 'sem-data';
+        };
+
+  const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
   const processXmlFiles = async (files: File[]) => {
     if (files.length === 0) return;
     setIsAddingXmls(true);
+    let etapa = 'preparar';
     try {
       const { parseXmlFiles } = await import('@/lib/xml-parser');
       const { reconcileMissing } = await import('@/lib/confronto-engine');
       const { salvarXmls } = await import('@/lib/xml-storage');
+
+      etapa = 'ler os XMLs';
       const xmlData = await parseXmlFiles(files);
 
       // Persistir os XMLs na base da empresa para reaproveitamento futuro
       let salvos = 0;
       if (empresaId && user && xmlData.length > 0) {
-        salvos = await salvarXmls(empresaId, user.id, xmlData);
+        etapa = 'salvar na base';
+        salvos = await salvarXmls(empresaId, user.id, xmlData, (feitos, total) =>
+          setProgressMsg(`Salvando ${feitos.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')} XML(s)…`)
+        );
+        setProgressMsg(null);
       }
 
-      // Filtro de mês: aceita também notas com data não parseada ('sem-data')
-      const monthFilter = selectedMonth === 'todos'
-        ? undefined
-        : (row: ConfrontoResult) => {
-            const k = getMonthKey(row.data);
-            return k === selectedMonth || k === 'sem-data';
-          };
+      etapa = 'reconciliar';
       const { results: newResults, summary: newSummary, matched, unmatched } = reconcileMissing(
         results,
         xmlData,
-        monthFilter
+        monthFilterFn()
       );
       setResults(newResults);
       setSummary(newSummary);
@@ -275,7 +288,7 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
           await onUpdate(newResults, newSummary);
         } catch (persistErr) {
           console.error('Erro ao persistir análise atualizada:', persistErr);
-          toast.error('XMLs reconciliados, mas falha ao salvar atualização');
+          toast.error(`XMLs reconciliados, mas falha ao salvar atualização: ${errMsg(persistErr)}`);
         }
       }
       const monthLabel = selectedMonth === 'todos' ? '' : `${formatMonthLabel(selectedMonth)}: `;
@@ -286,13 +299,82 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
         description: descParts.length > 0 ? descParts.join(' · ') : undefined,
       });
     } catch (err) {
-      console.error('Erro ao adicionar XMLs:', err);
-      toast.error('Falha ao processar XMLs');
+      console.error(`Erro ao adicionar XMLs (etapa: ${etapa}):`, err);
+      toast.error(`Falha ao ${etapa}: ${errMsg(err)}`, { duration: 12000 });
     } finally {
+      setProgressMsg(null);
       setIsAddingXmls(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
+  /**
+   * Reconcilia as linhas "Ausente no XML" contra os XMLs já armazenados na base
+   * da empresa (e das filiais do mesmo CNPJ raiz), sem precisar reanexar arquivos.
+   */
+  const reconciliarComBase = async () => {
+    if (!empresaId) {
+      toast.error('Selecione uma empresa para reconciliar com a base');
+      return;
+    }
+    setIsReconciling(true);
+    let etapa = 'carregar a base de XMLs';
+    try {
+      const { carregarXmlsDaEmpresa } = await import('@/lib/xml-storage');
+      const { reconcileMissing } = await import('@/lib/confronto-engine');
+      const base = await carregarXmlsDaEmpresa(empresaId, (feitos, total) =>
+        setProgressMsg(`Carregando ${feitos.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')} XML(s) da base…`)
+      );
+      setProgressMsg(null);
+      if (base.length === 0) {
+        toast.info('Nenhum XML armazenado para esta empresa');
+        return;
+      }
+
+      etapa = 'reconciliar com a base';
+      const existentes = new Set(
+        results.filter((r) => r.status !== 'ausente_xml').map((r) => r.chNFe).filter((c) => !!c && c.length === 44)
+      );
+      const candidatos = base.filter((x) => !existentes.has(x.chNFe));
+
+      const { results: newResults, summary: newSummary, matched } = reconcileMissing(
+        results,
+        candidatos,
+        monthFilterFn()
+      );
+      // Não transformar toda a base em "Não escriturado": manter só linhas já existentes + as reconciliadas
+      const keys = new Set(results.map((r) => (r.chNFe && r.chNFe.length === 44 ? `ch:${r.chNFe}` : `n:${r.nNF}|${r.serie}|${r.valorPlanilha ?? r.valorXml ?? ''}`)));
+      const filtered = newResults.filter((r) => {
+        const k = r.chNFe && r.chNFe.length === 44 ? `ch:${r.chNFe}` : `n:${r.nNF}|${r.serie}|${r.valorPlanilha ?? r.valorXml ?? ''}`;
+        return keys.has(k) || r.status !== 'nao_escriturado';
+      });
+      const { recomputeSummary: recompute } = await import('@/lib/confronto-engine');
+      const finalResults = filtered;
+      const finalSummary = filtered.length === newResults.length ? newSummary : recompute(filtered);
+
+      setResults(finalResults);
+      setSummary(finalSummary);
+      if (onUpdate) {
+        try {
+          await onUpdate(finalResults, finalSummary);
+        } catch (persistErr) {
+          console.error('Erro ao persistir análise atualizada:', persistErr);
+          toast.error(`Reconciliado, mas falha ao salvar atualização: ${errMsg(persistErr)}`);
+        }
+      }
+      const monthLabel = selectedMonth === 'todos' ? '' : `${formatMonthLabel(selectedMonth)}: `;
+      toast.success(`${monthLabel}${matched} nota(s) reconciliada(s) com a base`, {
+        description: `${base.length.toLocaleString('pt-BR')} XML(s) da base consultados`,
+      });
+    } catch (err) {
+      console.error(`Erro ao reconciliar com a base (etapa: ${etapa}):`, err);
+      toast.error(`Falha ao ${etapa}: ${errMsg(err)}`, { duration: 12000 });
+    } finally {
+      setProgressMsg(null);
+      setIsReconciling(false);
+    }
+  };
+
 
   const handleXmlFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []).filter((f) => f.name.toLowerCase().endsWith('.xml'));
@@ -427,6 +509,11 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             {resultsForMonth.length} registro{resultsForMonth.length === 1 ? '' : 's'}
             {selectedMonth !== 'todos' ? ' nesta competência' : ' processados'}
           </p>
+          {progressMsg && (
+            <p className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+              <Loader2 className="h-3 w-3 animate-spin" /> {progressMsg}
+            </p>
+          )}
         </div>
         <div className="flex gap-3 flex-wrap">
           <input
@@ -448,6 +535,12 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             <Button variant="outline" onClick={handleAddXmlsClick} disabled={isAddingXmls}>
               {isAddingXmls ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Adicionar XMLs
+            </Button>
+          )}
+          {canEditXmls && !!empresaId && (
+            <Button variant="outline" onClick={reconciliarComBase} disabled={isReconciling || isAddingXmls}>
+              {isReconciling ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Reconciliar com a base
             </Button>
           )}
           {canEditXmls && (
