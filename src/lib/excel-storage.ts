@@ -75,18 +75,35 @@ export async function salvarLinhasExcel(
 }
 
 /** Carrega todas as linhas Excel armazenadas para uma empresa. */
+/**
+ * Carrega todas as linhas Excel armazenadas para uma empresa.
+ * Paginado: a API de dados limita cada resposta a 1000 registros.
+ */
 export async function carregarLinhasDaEmpresa(empresaId: string): Promise<ExcelNfeData[]> {
-  const { data, error } = await supabase
-    .from('excel_linhas_armazenadas')
-    .select('row_data')
-    .eq('empresa_id', empresaId);
+  const PAGE = 1000;
+  const todas: ExcelNfeData[] = [];
 
-  if (error || !data) {
-    console.error('Erro ao carregar linhas Excel:', error);
-    return [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('excel_linhas_armazenadas')
+      .select('row_data')
+      .eq('empresa_id', empresaId)
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1);
+
+    if (error) {
+      console.error('Erro ao carregar linhas Excel:', error);
+      throw new Error(`Falha ao carregar a base de planilhas (${error.code ?? 'erro'}): ${error.message}`);
+    }
+    const page = data ?? [];
+    todas.push(...page.map((r) => r.row_data as unknown as ExcelNfeData));
+    if (page.length < PAGE) break;
+    if (from > 500_000) break;
   }
-  return data.map((r) => r.row_data as unknown as ExcelNfeData);
+
+  return todas;
 }
+
 
 /** Mescla duas listas eliminando duplicatas pela chave composta. */
 export function mesclarLinhas(a: ExcelNfeData[], b: ExcelNfeData[]): ExcelNfeData[] {
