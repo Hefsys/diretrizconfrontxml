@@ -509,6 +509,11 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
             {resultsForMonth.length} registro{resultsForMonth.length === 1 ? '' : 's'}
             {selectedMonth !== 'todos' ? ' nesta competência' : ' processados'}
           </p>
+          {progressMsg && (
+            <p className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+              <Loader2 className="h-3 w-3 animate-spin" /> {progressMsg}
+            </p>
+          )}
         </div>
         <div className="flex gap-3 flex-wrap">
           <input
