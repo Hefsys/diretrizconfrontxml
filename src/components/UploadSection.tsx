@@ -279,7 +279,7 @@ export function UploadSection({ onProcess, isProcessing, progressLabel }: Upload
       )}
 
       {/* Process Button */}
-      <div className="flex justify-center">
+      <div className="flex flex-col items-center gap-2">
         <Button
           size="lg"
           disabled={!canProcess || isProcessing}
@@ -295,6 +295,9 @@ export function UploadSection({ onProcess, isProcessing, progressLabel }: Upload
             'Processar Confronto'
           )}
         </Button>
+        {isProcessing && progressLabel && (
+          <p className="text-xs text-muted-foreground">{progressLabel}</p>
+        )}
       </div>
     </div>
   );
