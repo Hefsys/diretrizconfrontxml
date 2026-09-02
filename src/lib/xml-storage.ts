@@ -5,14 +5,18 @@ function cleanCnpj(v: string): string {
   return String(v ?? '').replace(/[.\-\/\s]/g, '');
 }
 
+const CHUNK_SALVAR = 500;
+
 /**
- * Salva (upsert) XMLs novos para uma empresa. Se a chave já existir, ignora.
- * Retorna o número de novos registros inseridos.
+ * Salva (upsert) XMLs novos para uma empresa, em lotes, para não estourar o
+ * limite de tamanho/tempo de requisição quando o usuário anexa muitos arquivos.
+ * Retorna o número de registros gravados.
  */
 export async function salvarXmls(
   empresaId: string,
   uploadedBy: string,
-  xmls: XmlNfeData[]
+  xmls: XmlNfeData[],
+  onProgress?: (salvos: number, total: number) => void
 ): Promise<number> {
   if (xmls.length === 0) return 0;
   const rows = xmls
@@ -24,6 +28,7 @@ export async function salvarXmls(
       serie: x.serie,
       dh_emi: x.dhEmi,
       cnpj_emitente: cleanCnpj(x.cnpjEmitente),
+      cnpj_dest: cleanCnpj(x.cnpjDest ?? '') || null,
       x_nome: x.xNome,
       v_nf: x.vNF,
       v_ipi: x.vIPI,
@@ -34,17 +39,25 @@ export async function salvarXmls(
 
   if (rows.length === 0) return 0;
 
-  const { data, error } = await supabase
-    .from('xmls_armazenados')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .upsert(rows as any, { onConflict: 'empresa_id,ch_nfe', ignoreDuplicates: false })
-    .select('id');
+  let salvos = 0;
+  for (let i = 0; i < rows.length; i += CHUNK_SALVAR) {
+    const chunk = rows.slice(i, i + CHUNK_SALVAR);
+    const { data, error } = await supabase
+      .from('xmls_armazenados')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .upsert(chunk as any, { onConflict: 'empresa_id,ch_nfe', ignoreDuplicates: false })
+      .select('id');
 
-  if (error) {
-    console.error('Erro ao salvar XMLs:', error);
-    return 0;
+    if (error) {
+      console.error('Erro ao salvar XMLs:', error);
+      throw new Error(
+        `Falha ao salvar XMLs (lote ${Math.floor(i / CHUNK_SALVAR) + 1}, ${error.code ?? 'erro'}): ${error.message}`
+      );
+    }
+    salvos += data?.length ?? 0;
+    onProgress?.(Math.min(i + chunk.length, rows.length), rows.length);
   }
-  return data?.length ?? 0;
+  return salvos;
 }
 
 /**
@@ -66,23 +79,94 @@ async function idsDoGrupo(empresaId: string): Promise<string[]> {
   return ids.length > 0 ? ids : [empresaId];
 }
 
-/**
- * Carrega todos os XMLs armazenados para uma empresa (e demais filiais do
- * mesmo CNPJ raiz).
- *
- * A API de dados devolve no máximo 1000 registros por requisição, então a
- * leitura é paginada com `range()` — sem isso, bases grandes retornavam apenas
- * os 1000 primeiros XMLs e o confronto marcava notas válidas como ausentes.
- */
-export async function carregarXmlsDaEmpresa(empresaId: string): Promise<XmlNfeData[]> {
-  const ids = await idsDoGrupo(empresaId);
-  const PAGE = 1000;
-  const todos: XmlNfeData[] = [];
+const SLIM_COLS = 'ch_nfe, n_nf, serie, dh_emi, cnpj_emitente, cnpj_dest, x_nome, v_nf, v_ipi, cancelada';
 
-  for (let from = 0; ; from += PAGE) {
+interface SlimRow {
+  ch_nfe: string | null;
+  n_nf: string | null;
+  serie: string | null;
+  dh_emi: string | null;
+  cnpj_emitente: string | null;
+  cnpj_dest?: string | null;
+  x_nome: string | null;
+  v_nf: number | null;
+  v_ipi: number | null;
+  cancelada: boolean | null;
+}
+
+function toXmlNfe(r: SlimRow): XmlNfeData {
+  return {
+    chNFe: r.ch_nfe ?? '',
+    nNF: r.n_nf ?? '',
+    serie: r.serie ?? '',
+    dhEmi: r.dh_emi ?? '',
+    cnpjEmitente: r.cnpj_emitente ?? '',
+    cnpjDest: r.cnpj_dest ?? undefined,
+    xNome: r.x_nome ?? '',
+    vNF: Number(r.v_nf ?? 0),
+    vBC: 0,
+    vICMS: 0,
+    vBCST: 0,
+    vST: 0,
+    vIPI: Number(r.v_ipi ?? 0),
+    vPIS: 0,
+    vCOFINS: 0,
+    vProd: 0,
+    cancelada: !!r.cancelada,
+  };
+}
+
+const PAGE = 1000;
+const CONCURRENCY = 4;
+
+/** Executa tarefas com concorrência limitada, preservando a ordem dos resultados. */
+async function poolAll<T>(tasks: Array<() => Promise<T>>, limit = CONCURRENCY): Promise<T[]> {
+  const out: T[] = new Array(tasks.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, async () => {
+    while (true) {
+      const i = next++;
+      if (i >= tasks.length) return;
+      out[i] = await tasks[i]();
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+/**
+ * Carrega todos os XMLs armazenados da empresa (e das filiais do mesmo CNPJ
+ * raiz), lendo apenas as colunas usadas pelo confronto — o campo `xml_data`
+ * completo tornava a leitura pesada (dezenas de MB). As páginas de 1000
+ * registros são buscadas em paralelo, com concorrência limitada.
+ */
+export async function carregarXmlsDaEmpresa(
+  empresaId: string,
+  onProgress?: (carregados: number, total: number) => void
+): Promise<XmlNfeData[]> {
+  const ids = await idsDoGrupo(empresaId);
+
+  const { count, error: countError } = await supabase
+    .from('xmls_armazenados')
+    .select('ch_nfe', { count: 'exact', head: true })
+    .in('empresa_id', ids);
+
+  if (countError) {
+    console.error('Erro ao contar XMLs:', countError);
+    throw new Error(`Falha ao consultar a base de XMLs (${countError.code ?? 'erro'}): ${countError.message}`);
+  }
+
+  const total = count ?? 0;
+  if (total === 0) return [];
+
+  const paginas = Math.min(Math.ceil(total / PAGE), 500);
+  let carregados = 0;
+
+  const tasks = Array.from({ length: paginas }, (_, p) => async () => {
+    const from = p * PAGE;
     const { data, error } = await supabase
       .from('xmls_armazenados')
-      .select('xml_data')
+      .select(SLIM_COLS)
       .in('empresa_id', ids)
       .order('ch_nfe', { ascending: true })
       .range(from, from + PAGE - 1);
@@ -91,17 +175,15 @@ export async function carregarXmlsDaEmpresa(empresaId: string): Promise<XmlNfeDa
       console.error('Erro ao carregar XMLs:', error);
       throw new Error(`Falha ao carregar XMLs da base (${error.code ?? 'erro'}): ${error.message}`);
     }
-    const page = data ?? [];
-    todos.push(...page.map((r) => r.xml_data as unknown as XmlNfeData));
-    if (page.length < PAGE) break;
-    // trava de segurança contra loops infinitos
-    if (from > 500_000) break;
-  }
+    const rows = (data ?? []) as unknown as SlimRow[];
+    carregados += rows.length;
+    onProgress?.(carregados, total);
+    return rows.map(toXmlNfe);
+  });
 
-  return todos;
+  const pages = await poolAll(tasks);
+  return pages.flat();
 }
-
-
 
 /**
  * Mescla duas listas de XMLs eliminando duplicatas pela chave NF-e.
