@@ -222,15 +222,29 @@ export function UploadSection({ onProcess, isProcessing, progressLabel }: Upload
               />
               <Button
                 variant="outline"
+                disabled={readingExcel}
                 onClick={() => excelInputRef.current?.click()}
                 className="border-diretriz-dark/30 text-diretriz-dark hover:bg-diretriz-dark/5"
               >
-                Selecionar Planilha
+                {readingExcel ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-diretriz-dark border-t-transparent" />
+                    Lendo planilha…
+                  </span>
+                ) : (
+                  'Selecionar Planilha'
+                )}
               </Button>
               {excelFileName && (
                 <div className="text-center">
                   <p className="text-sm font-medium">{excelFileName}</p>
-                  <p className="text-xs text-muted-foreground">{sheetNames.length} aba(s) encontrada(s)</p>
+                  {readingExcel ? (
+                    <p className="text-xs text-muted-foreground">Lendo abas da planilha…</p>
+                  ) : excelError ? (
+                    <p className="text-xs text-destructive">{excelError}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">{sheetNames.length} aba(s) encontrada(s)</p>
+                  )}
                 </div>
               )}
             </div>
