@@ -69,20 +69,38 @@ async function idsDoGrupo(empresaId: string): Promise<string[]> {
 /**
  * Carrega todos os XMLs armazenados para uma empresa (e demais filiais do
  * mesmo CNPJ raiz).
+ *
+ * A API de dados devolve no máximo 1000 registros por requisição, então a
+ * leitura é paginada com `range()` — sem isso, bases grandes retornavam apenas
+ * os 1000 primeiros XMLs e o confronto marcava notas válidas como ausentes.
  */
 export async function carregarXmlsDaEmpresa(empresaId: string): Promise<XmlNfeData[]> {
   const ids = await idsDoGrupo(empresaId);
-  const { data, error } = await supabase
-    .from('xmls_armazenados')
-    .select('xml_data')
-    .in('empresa_id', ids);
+  const PAGE = 1000;
+  const todos: XmlNfeData[] = [];
 
-  if (error || !data) {
-    console.error('Erro ao carregar XMLs:', error);
-    return [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('xmls_armazenados')
+      .select('xml_data')
+      .in('empresa_id', ids)
+      .order('ch_nfe', { ascending: true })
+      .range(from, from + PAGE - 1);
+
+    if (error) {
+      console.error('Erro ao carregar XMLs:', error);
+      throw new Error(`Falha ao carregar XMLs da base (${error.code ?? 'erro'}): ${error.message}`);
+    }
+    const page = data ?? [];
+    todos.push(...page.map((r) => r.xml_data as unknown as XmlNfeData));
+    if (page.length < PAGE) break;
+    // trava de segurança contra loops infinitos
+    if (from > 500_000) break;
   }
-  return data.map((r) => r.xml_data as unknown as XmlNfeData);
+
+  return todos;
 }
+
 
 
 /**
