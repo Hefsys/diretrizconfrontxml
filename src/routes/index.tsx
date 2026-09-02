@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router';
-import { useState, useCallback, useEffect, type ComponentType } from 'react';
+import { useState, useCallback, useEffect, Component, type ReactNode, type ComponentType } from 'react';
 import type { WorkBook } from 'xlsx';
 import type { ConfrontoResult, ConfrontoSummary } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
@@ -7,6 +7,47 @@ import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import logoDiretriz from '@/assets/logo-diretriz-vertical.png';
+
+class ResultsErrorBoundary extends Component<{ children: ReactNode; onReset: () => void }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: unknown) {
+    console.error('[confronto] erro ao exibir os resultados:', error, info);
+  }
+
+  render() {
+    const { error } = this.state;
+    if (!error) return this.props.children;
+    return (
+      <div className="mx-auto max-w-3xl rounded-lg border border-destructive/30 bg-destructive/5 p-6">
+        <h2 className="text-lg font-semibold text-destructive">Não foi possível exibir os resultados</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          O confronto foi processado, mas ocorreu um erro ao montar a tela. Detalhe técnico:
+        </p>
+        <pre className="mt-3 max-h-40 overflow-auto rounded-md bg-muted p-3 font-mono text-xs text-destructive">
+          {error.name}: {error.message}
+        </pre>
+        <div className="mt-4 flex gap-3">
+          <Button onClick={() => this.setState({ error: null })}>Tentar novamente</Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              this.setState({ error: null });
+              this.props.onReset();
+            }}
+          >
+            Voltar ao envio
+          </Button>
+        </div>
+      </div>
+    );
+  }
+}
+
 
 
 export const Route = createFileRoute('/')({
