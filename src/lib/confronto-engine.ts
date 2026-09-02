@@ -48,6 +48,23 @@ function cnpjLooseXml(x: { cnpjEmitente?: string | null; cnpjDest?: string | nul
   return cnpjCompatXml(x, rowCnpj) || !cleanCnpj(x.cnpjDest ?? '');
 }
 
+/**
+ * Valor do XML comparável ao "Valor Contábil" da planilha.
+ * Algumas notas (ex.: Yamaha) somam PIS ST / COFINS ST ao vNF como despesa
+ * acessória, valores que o Dealernet não lança no Valor Contábil. Quando o
+ * valor escriturado do XML bate com a planilha, é ele que vale.
+ */
+function valorXmlComparavel(xml: XmlNfeData, planilhaVal: number | null | undefined): number {
+  const esc = xml.vEscriturado;
+  if (esc != null && planilhaVal != null && Math.abs(planilhaVal - esc) <= 0.01) return esc;
+  return xml.vNF;
+}
+
+/** O XML bate em valor com a linha da planilha (vNF ou valor escriturado). */
+function valorBate(xml: XmlNfeData, planilhaVal: number | null | undefined): boolean {
+  return planilhaVal != null && Math.abs(valorXmlComparavel(xml, planilhaVal) - planilhaVal) <= 0.01;
+}
+
 
 
 export function recomputeSummary(results: ConfrontoResult[]): ConfrontoSummary {
@@ -126,7 +143,10 @@ export function reconcileMissing(
 
   for (let i = 0; i < results.length; i++) {
     const row = results[i];
-    if (row.status !== 'ausente_xml') continue;
+    // Revisita ausentes e também divergentes: uma divergência pode ser apenas
+    // despesa acessória (PIS/COFINS ST) somada ao vNF, resolvida ao recomparar.
+    const revisitando = row.status === 'divergente';
+    if (row.status !== 'ausente_xml' && !revisitando) continue;
     if (monthFilter && !monthFilter(row)) continue;
 
     let xmlIdx = -1;
@@ -160,6 +180,9 @@ export function reconcileMissing(
       );
     }
 
+    // Linhas já divergentes só são reavaliadas com casamento seguro (chave/nNF+CNPJ/série)
+    if (revisitando && xmlIdx === -1) continue;
+
     // 2c) Match por nNF + valor aproximado
     if (xmlIdx === -1 && row.nNF && row.valorPlanilha != null) {
       const planilhaVal = row.valorPlanilha;
@@ -167,9 +190,10 @@ export function reconcileMissing(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
-          Math.abs(xml.vNF - planilhaVal) <= 0.01
+          valorBate(xml, planilhaVal)
       );
     }
+
 
     // 3) Fallback: nNF apenas (somente se único no conjunto novo E a linha não tem CNPJ).
 
@@ -188,7 +212,7 @@ export function reconcileMissing(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
           cnpjMatchXml(xml, row.cnpjEmitente) &&
-          Math.abs(xml.vNF - planilhaVal) <= 0.01
+          valorBate(xml, planilhaVal)
       );
     }
 
@@ -196,15 +220,17 @@ export function reconcileMissing(
     usedXmlIdx.add(xmlIdx);
     const xml = newXmlData[xmlIdx];
     const planilhaVal = (row.valorPlanilha ?? 0);
-    const diff = Math.abs(planilhaVal - xml.vNF);
+    const valorXml = valorXmlComparavel(xml, planilhaVal);
+    const diff = Math.abs(planilhaVal - valorXml);
     results[i] = {
       ...row,
       status: xml.cancelada ? 'cancelada' : (diff <= 0.01 ? 'ok' : 'divergente'),
-      valorXml: xml.vNF,
-      diferenca: xml.cancelada ? null : (diff > 0.01 ? planilhaVal - xml.vNF : 0),
+      valorXml,
+      diferenca: xml.cancelada ? null : (diff > 0.01 ? planilhaVal - valorXml : 0),
       chNFe: xml.chNFe || row.chNFe,
       nomeEmitente: row.nomeEmitente || xml.xNome,
     };
+
     matched++;
   }
 
@@ -462,7 +488,7 @@ export function runConfronto(
       const found = cand.find(
         (idx) =>
           !usedXmlIdx.has(idx) &&
-          Math.abs(xmlData[idx].vNF - row.valorContabil) <= 0.01
+          valorBate(xmlData[idx], row.valorContabil)
       );
       if (found !== undefined) matchedIdx = found;
     }
@@ -481,7 +507,7 @@ export function runConfronto(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
           cnpjMatchXml(xml, row.cnpjEmitente) &&
-          Math.abs(xml.vNF - row.valorContabil) <= 0.01
+          valorBate(xml, row.valorContabil)
       );
     }
 
@@ -491,7 +517,8 @@ export function runConfronto(
     if (matchedXml) {
       usedXmlIdx.add(matchedIdx);
       const valorPlanilha = row.valorContabil;
-      const diff = Math.abs(valorPlanilha - matchedXml.vNF);
+      const valorXmlComp = valorXmlComparavel(matchedXml, valorPlanilha);
+      const diff = Math.abs(valorPlanilha - valorXmlComp);
       results.push({
         status: matchedXml.cancelada ? 'cancelada' : (diff <= 0.01 ? 'ok' : 'divergente'),
         nNF: row.nNF,
@@ -500,8 +527,9 @@ export function runConfronto(
         cnpjEmitente: row.cnpjEmitente,
         nomeEmitente: row.nomeEmitente || matchedXml.xNome,
         valorPlanilha,
-        valorXml: matchedXml.vNF,
-        diferenca: matchedXml.cancelada ? null : (diff > 0.01 ? valorPlanilha - matchedXml.vNF : 0),
+        valorXml: valorXmlComp,
+        diferenca: matchedXml.cancelada ? null : (diff > 0.01 ? valorPlanilha - valorXmlComp : 0),
+
         chNFe: matchedXml.chNFe,
         sheetName: row.sheetName,
         cfop: row.cfop,

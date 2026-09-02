@@ -16,7 +16,19 @@ export interface XmlNfeData {
   vPIS: number;
   vCOFINS: number;
   vProd: number;
+  /** Frete, seguro, outras despesas e desconto (totais da NF-e). */
+  vFrete?: number;
+  vSeguro?: number;
+  vOutro?: number;
+  vDesc?: number;
+  /**
+   * Valor da nota como o Dealernet escritura no "Valor Contábil":
+   * produtos + frete + seguro + outras despesas - desconto + ICMS ST + IPI.
+   * Ignora despesas acessórias somadas ao vNF (ex.: PIS ST / COFINS ST).
+   */
+  vEscriturado?: number;
   cancelada: boolean;
+
 }
 
 export interface ExcelNfeData {
