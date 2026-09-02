@@ -532,6 +532,12 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
               Adicionar XMLs
             </Button>
           )}
+          {canEditXmls && !!empresaId && (
+            <Button variant="outline" onClick={reconciliarComBase} disabled={isReconciling || isAddingXmls}>
+              {isReconciling ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Reconciliar com a base
+            </Button>
+          )}
           {canEditXmls && (
             <Button variant="outline" onClick={handleAddExcelClick} disabled={isAddingExcel}>
               {isAddingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
