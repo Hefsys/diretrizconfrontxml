@@ -233,6 +233,7 @@ export type Database = {
         Row: {
           cancelada: boolean
           ch_nfe: string
+          cnpj_dest: string | null
           cnpj_emitente: string | null
           created_at: string
           dh_emi: string | null
@@ -250,6 +251,7 @@ export type Database = {
         Insert: {
           cancelada?: boolean
           ch_nfe: string
+          cnpj_dest?: string | null
           cnpj_emitente?: string | null
           created_at?: string
           dh_emi?: string | null
@@ -267,6 +269,7 @@ export type Database = {
         Update: {
           cancelada?: boolean
           ch_nfe?: string
+          cnpj_dest?: string | null
           cnpj_emitente?: string | null
           created_at?: string
           dh_emi?: string | null
