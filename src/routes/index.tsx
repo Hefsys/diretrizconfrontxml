@@ -212,8 +212,11 @@ function Index() {
         {view === 'upload' ? (
           <UploadComp onProcess={handleProcess} isProcessing={isProcessing} progressLabel={progressLabel} />
         ) : summary ? (
-          <ResultsComp results={results} summary={summary} onReset={handleReset} empresaId={empresaId} />
+          <ResultsErrorBoundary onReset={handleReset}>
+            <ResultsComp results={results} summary={summary} onReset={handleReset} empresaId={empresaId} />
+          </ResultsErrorBoundary>
         ) : null}
+
       </main>
     </div>
   );
