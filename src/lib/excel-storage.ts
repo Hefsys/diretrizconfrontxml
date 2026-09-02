@@ -74,16 +74,50 @@ export async function salvarLinhasExcel(
   return data?.length ?? 0;
 }
 
-/** Carrega todas as linhas Excel armazenadas para uma empresa. */
+const PAGE = 1000;
+const CONCURRENCY = 4;
+
+async function poolAll<T>(tasks: Array<() => Promise<T>>, limit = CONCURRENCY): Promise<T[]> {
+  const out: T[] = new Array(tasks.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, async () => {
+    while (true) {
+      const i = next++;
+      if (i >= tasks.length) return;
+      out[i] = await tasks[i]();
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 /**
  * Carrega todas as linhas Excel armazenadas para uma empresa.
- * Paginado: a API de dados limita cada resposta a 1000 registros.
+ * Paginado (a API limita 1000 registros por resposta) e com as páginas
+ * buscadas em paralelo, com concorrência limitada.
  */
-export async function carregarLinhasDaEmpresa(empresaId: string): Promise<ExcelNfeData[]> {
-  const PAGE = 1000;
-  const todas: ExcelNfeData[] = [];
+export async function carregarLinhasDaEmpresa(
+  empresaId: string,
+  onProgress?: (carregadas: number, total: number) => void
+): Promise<ExcelNfeData[]> {
+  const { count, error: countError } = await supabase
+    .from('excel_linhas_armazenadas')
+    .select('id', { count: 'exact', head: true })
+    .eq('empresa_id', empresaId);
 
-  for (let from = 0; ; from += PAGE) {
+  if (countError) {
+    console.error('Erro ao contar linhas Excel:', countError);
+    throw new Error(`Falha ao consultar a base de planilhas (${countError.code ?? 'erro'}): ${countError.message}`);
+  }
+
+  const total = count ?? 0;
+  if (total === 0) return [];
+
+  const paginas = Math.min(Math.ceil(total / PAGE), 500);
+  let carregadas = 0;
+
+  const tasks = Array.from({ length: paginas }, (_, p) => async () => {
+    const from = p * PAGE;
     const { data, error } = await supabase
       .from('excel_linhas_armazenadas')
       .select('row_data')
@@ -95,13 +129,14 @@ export async function carregarLinhasDaEmpresa(empresaId: string): Promise<ExcelN
       console.error('Erro ao carregar linhas Excel:', error);
       throw new Error(`Falha ao carregar a base de planilhas (${error.code ?? 'erro'}): ${error.message}`);
     }
-    const page = data ?? [];
-    todas.push(...page.map((r) => r.row_data as unknown as ExcelNfeData));
-    if (page.length < PAGE) break;
-    if (from > 500_000) break;
-  }
+    const rows = data ?? [];
+    carregadas += rows.length;
+    onProgress?.(carregadas, total);
+    return rows.map((r) => r.row_data as unknown as ExcelNfeData);
+  });
 
-  return todas;
+  const pages = await poolAll(tasks);
+  return pages.flat();
 }
 
 

@@ -260,7 +260,15 @@ export function autoDetectSheet(workbook: XLSX.WorkBook): string {
   for (const name of names) {
     const ws = workbook.Sheets[name];
     if (!ws) continue;
-    const data: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    // Só as primeiras linhas bastam para achar o cabeçalho — converter a aba
+    // inteira travava a interface em planilhas grandes.
+    const data: unknown[][] = XLSX.utils.sheet_to_json(ws, {
+      header: 1,
+      defval: '',
+      blankrows: true,
+      range: 0,
+      sheetRows: 30,
+    } as XLSX.Sheet2JSONOpts);
     const headerIdx = findHeaderRow(data);
     if (headerIdx >= 0) return name;
   }
