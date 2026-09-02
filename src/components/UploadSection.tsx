@@ -59,13 +59,26 @@ export function UploadSection({ onProcess, isProcessing, progressLabel }: Upload
     const file = e.target.files?.[0];
     if (!file) return;
     setExcelFileName(file.name);
-    const buffer = await file.arrayBuffer();
-    const wb = readWorkbook(buffer);
-    setWorkbook(wb);
-    const names = getSheetNames(wb);
-    setSheetNames(names);
-    const auto = autoDetectSheet(wb);
-    setSelectedSheets(auto ? [auto] : names.length > 0 ? [names[0]] : []);
+    setExcelError('');
+    setReadingExcel(true);
+    setWorkbook(null);
+    setSheetNames([]);
+    setSelectedSheets([]);
+    try {
+      const buffer = await file.arrayBuffer();
+      // dá um tick para a interface pintar o estado "Lendo planilha…"
+      await new Promise((r) => setTimeout(r, 0));
+      const wb = readWorkbook(buffer);
+      const names = getSheetNames(wb);
+      const auto = autoDetectSheet(wb);
+      setWorkbook(wb);
+      setSheetNames(names);
+      setSelectedSheets(auto ? [auto] : names.length > 0 ? [names[0]] : []);
+    } catch (err) {
+      setExcelError(err instanceof Error ? err.message : 'Não foi possível ler esta planilha.');
+    } finally {
+      setReadingExcel(false);
+    }
   }, []);
 
   const toggleSheet = (name: string) => {
@@ -74,7 +87,7 @@ export function UploadSection({ onProcess, isProcessing, progressLabel }: Upload
     );
   };
 
-  const canProcess = !!empresaId && (!workbook || selectedSheets.length > 0);
+  const canProcess = !!empresaId && !readingExcel && (!workbook || selectedSheets.length > 0);
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
