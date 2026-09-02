@@ -25,6 +25,7 @@ function Index() {
   const [mounted, setMounted] = useState(false);
   const [view, setView] = useState<'upload' | 'results'>('upload');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [progressLabel, setProgressLabel] = useState('');
   const [results, setResults] = useState<ConfrontoResult[]>([]);
   const [summary, setSummary] = useState<ConfrontoSummary | null>(null);
   const [empresaId, setEmpresaId] = useState<string>('');
@@ -50,6 +51,7 @@ function Index() {
 
   const handleProcess = useCallback(async (xmlFiles: File[], workbook: WorkBook | null, selectedSheets: string[], empId: string) => {
     setIsProcessing(true);
+    setProgressLabel('');
     try {
       const { parseXmlFiles } = await import('@/lib/xml-parser');
       const { parseSheet } = await import('@/lib/excel-parser');
@@ -58,27 +60,36 @@ function Index() {
       const { salvarLinhasExcel, carregarLinhasDaEmpresa, mesclarLinhas } = await import('@/lib/excel-storage');
 
       // 1. Parse uploaded XMLs
-      const novosXmls = await parseXmlFiles(xmlFiles);
+      const novosXmls = xmlFiles.length > 0
+        ? await parseXmlFiles(xmlFiles, (lidos, total) =>
+            setProgressLabel(`Lendo XMLs: ${lidos} de ${total}`))
+        : [];
 
       // 2. Save new XMLs to the company's database
       let xmlsSalvos = 0;
       if (novosXmls.length > 0 && user) {
-        xmlsSalvos = await salvarXmls(empId, user.id, novosXmls);
+        xmlsSalvos = await salvarXmls(empId, user.id, novosXmls, (salvos, total) =>
+          setProgressLabel(`Salvando XMLs: ${salvos} de ${total}`));
       }
 
       // 3. Load all stored XMLs for this company and merge
-      const historicoXmls = await carregarXmlsDaEmpresa(empId);
+      setProgressLabel('Carregando base de XMLs…');
+      const historicoXmls = await carregarXmlsDaEmpresa(empId, (carregados, total) =>
+        setProgressLabel(`Carregando base de XMLs: ${carregados} de ${total}`));
       const todosXmls = mesclarXmls(novosXmls, historicoXmls);
 
       // 4. Parse Excel (se enviado), salvar novas linhas e mesclar com base histórica
+      setProgressLabel('Lendo planilha…');
       const novasLinhas = workbook
         ? selectedSheets.flatMap((sheet) => parseSheet(workbook, sheet))
         : [];
       let linhasSalvas = 0;
       if (novasLinhas.length > 0 && user) {
+        setProgressLabel(`Salvando ${novasLinhas.length} linha(s) da planilha…`);
         linhasSalvas = await salvarLinhasExcel(empId, user.id, novasLinhas);
       }
-      const historicoLinhas = await carregarLinhasDaEmpresa(empId);
+      const historicoLinhas = await carregarLinhasDaEmpresa(empId, (carregadas, total) =>
+        setProgressLabel(`Carregando base de planilhas: ${carregadas} de ${total}`));
       const todasLinhas = mesclarLinhas(novasLinhas, historicoLinhas);
 
       if (todasLinhas.length === 0) {
@@ -86,6 +97,8 @@ function Index() {
         return;
       }
 
+      setProgressLabel(`Comparando ${todasLinhas.length} linha(s) com ${todosXmls.length} XML(s)…`);
+      await new Promise((r) => setTimeout(r, 0));
       const { results: r, summary: s } = runConfronto(todasLinhas, todosXmls);
 
       setEmpresaId(empId);
@@ -102,9 +115,9 @@ function Index() {
     } catch (err) {
       console.error('Processing error:', err);
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Erro ao processar confronto: ${msg}`);
+      toast.error(`Erro ao processar confronto: ${msg}`, { duration: 12000 });
     } finally {
-
+      setProgressLabel('');
       setIsProcessing(false);
     }
   }, [user]);
