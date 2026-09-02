@@ -101,8 +101,10 @@ function Index() {
       if (partes.length > 0) toast.success(partes.join(' · '));
     } catch (err) {
       console.error('Processing error:', err);
-      toast.error('Erro ao processar confronto');
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Erro ao processar confronto: ${msg}`);
     } finally {
+
       setIsProcessing(false);
     }
   }, [user]);
