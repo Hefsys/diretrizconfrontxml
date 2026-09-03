@@ -49,6 +49,16 @@ function cnpjLooseXml(x: { cnpjEmitente?: string | null; cnpjDest?: string | nul
 }
 
 /**
+ * CNPJ aceitável nos fallbacks (nº+série, nº+valor).
+ * Quando a planilha informa o CNPJ/CPF do emitente, ele é obrigatório: só casa
+ * com XML cujo emitente ou destinatário seja o mesmo documento. Sem CNPJ na
+ * linha, mantém a regra frouxa (XMLs antigos sem destinatário gravado).
+ */
+function cnpjOkFallback(x: { cnpjEmitente?: string | null; cnpjDest?: string | null }, rowCnpj: string | null | undefined): boolean {
+  return cleanCnpj(rowCnpj ?? '') ? cnpjMatchXml(x, rowCnpj) : cnpjLooseXml(x, rowCnpj);
+}
+
+/**
  * Valor do XML comparável ao "Valor Contábil" da planilha.
  * Algumas notas (ex.: Yamaha) somam PIS ST / COFINS ST ao vNF como despesa
  * acessória, valores que o Dealernet não lança no Valor Contábil. Quando o
