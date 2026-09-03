@@ -49,6 +49,16 @@ function cnpjLooseXml(x: { cnpjEmitente?: string | null; cnpjDest?: string | nul
 }
 
 /**
+ * CNPJ aceitável nos fallbacks (nº+série, nº+valor).
+ * Quando a planilha informa o CNPJ/CPF do emitente, ele é obrigatório: só casa
+ * com XML cujo emitente ou destinatário seja o mesmo documento. Sem CNPJ na
+ * linha, mantém a regra frouxa (XMLs antigos sem destinatário gravado).
+ */
+function cnpjOkFallback(x: { cnpjEmitente?: string | null; cnpjDest?: string | null }, rowCnpj: string | null | undefined): boolean {
+  return cleanCnpj(rowCnpj ?? '') ? cnpjMatchXml(x, rowCnpj) : cnpjLooseXml(x, rowCnpj);
+}
+
+/**
  * Valor do XML comparável ao "Valor Contábil" da planilha.
  * Algumas notas (ex.: Yamaha) somam PIS ST / COFINS ST ao vNF como despesa
  * acessória, valores que o Dealernet não lança no Valor Contábil. Quando o
@@ -176,7 +186,7 @@ export function reconcileMissing(
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
           normSerie(xml.serie) === serieRow &&
-          cnpjLooseXml(xml, row.cnpjEmitente)
+          cnpjOkFallback(xml, row.cnpjEmitente)
       );
     }
 
@@ -190,6 +200,7 @@ export function reconcileMissing(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
+          cnpjOkFallback(xml, row.cnpjEmitente) &&
           valorBate(xml, planilhaVal)
       );
     }
@@ -318,7 +329,7 @@ export function reconcileExcel(
           !usedRowIdx.has(idx) &&
           r.nNF === xmlRow.nNF &&
           normSerie(r.serie) === serieXml &&
-          cnpjLooseXml(xmlRow, r.cnpjEmitente)
+          cnpjOkFallback(xmlRow, r.cnpjEmitente)
       );
     }
 
@@ -329,6 +340,7 @@ export function reconcileExcel(
         (r, idx) =>
           !usedRowIdx.has(idx) &&
           r.nNF === xmlRow.nNF &&
+          cnpjOkFallback(xmlRow, r.cnpjEmitente) &&
           r.valorContabil != null &&
           Math.abs(r.valorContabil - xmlVal0) <= 0.01
       );
@@ -477,7 +489,7 @@ export function runConfronto(
         (idx) =>
           !usedXmlIdx.has(idx) &&
           normSerie(xmlData[idx].serie) === serieRow &&
-          cnpjLooseXml(xmlData[idx], row.cnpjEmitente)
+          cnpjOkFallback(xmlData[idx], row.cnpjEmitente)
       );
       if (found !== undefined) matchedIdx = found;
     }
@@ -488,6 +500,7 @@ export function runConfronto(
       const found = cand.find(
         (idx) =>
           !usedXmlIdx.has(idx) &&
+          cnpjOkFallback(xmlData[idx], row.cnpjEmitente) &&
           valorBate(xmlData[idx], row.valorContabil)
       );
       if (found !== undefined) matchedIdx = found;
