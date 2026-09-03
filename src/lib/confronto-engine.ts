@@ -489,7 +489,7 @@ export function runConfronto(
         (idx) =>
           !usedXmlIdx.has(idx) &&
           normSerie(xmlData[idx].serie) === serieRow &&
-          cnpjLooseXml(xmlData[idx], row.cnpjEmitente)
+          cnpjOkFallback(xmlData[idx], row.cnpjEmitente)
       );
       if (found !== undefined) matchedIdx = found;
     }
@@ -500,6 +500,7 @@ export function runConfronto(
       const found = cand.find(
         (idx) =>
           !usedXmlIdx.has(idx) &&
+          cnpjOkFallback(xmlData[idx], row.cnpjEmitente) &&
           valorBate(xmlData[idx], row.valorContabil)
       );
       if (found !== undefined) matchedIdx = found;
