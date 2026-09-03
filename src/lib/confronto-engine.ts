@@ -200,6 +200,7 @@ export function reconcileMissing(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
+          cnpjOkFallback(xml, row.cnpjEmitente) &&
           valorBate(xml, planilhaVal)
       );
     }
