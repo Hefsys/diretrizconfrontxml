@@ -186,7 +186,7 @@ export function reconcileMissing(
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
           normSerie(xml.serie) === serieRow &&
-          cnpjLooseXml(xml, row.cnpjEmitente)
+          cnpjOkFallback(xml, row.cnpjEmitente)
       );
     }
 
