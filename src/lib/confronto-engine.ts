@@ -329,7 +329,7 @@ export function reconcileExcel(
           !usedRowIdx.has(idx) &&
           r.nNF === xmlRow.nNF &&
           normSerie(r.serie) === serieXml &&
-          cnpjLooseXml(xmlRow, r.cnpjEmitente)
+          cnpjOkFallback(xmlRow, r.cnpjEmitente)
       );
     }
 
@@ -340,6 +340,7 @@ export function reconcileExcel(
         (r, idx) =>
           !usedRowIdx.has(idx) &&
           r.nNF === xmlRow.nNF &&
+          cnpjOkFallback(xmlRow, r.cnpjEmitente) &&
           r.valorContabil != null &&
           Math.abs(r.valorContabil - xmlVal0) <= 0.01
       );
