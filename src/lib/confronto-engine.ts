@@ -58,6 +58,14 @@ function cnpjOkFallback(x: { cnpjEmitente?: string | null; cnpjDest?: string | n
   return cleanCnpj(rowCnpj ?? '') ? cnpjMatchXml(x, rowCnpj) : cnpjLooseXml(x, rowCnpj);
 }
 
+/** Mesmo grupo (raiz de 8 dígitos do CNPJ) — matriz/filial. Só usar junto com valor. */
+function cnpjRaizOk(x: { cnpjEmitente?: string | null; cnpjDest?: string | null }, rowCnpj: string | null | undefined): boolean {
+  if (cnpjOkFallback(x, rowCnpj)) return true;
+  const c = cleanCnpj(rowCnpj ?? '');
+  if (c.length !== 14) return false;
+  return xmlCnpjList(x).some((v) => v.length === 14 && v.slice(0, 8) === c.slice(0, 8));
+}
+
 /**
  * Valor do XML comparável ao "Valor Contábil" da planilha.
  * Algumas notas (ex.: Yamaha) somam PIS ST / COFINS ST ao vNF como despesa
@@ -200,7 +208,8 @@ export function reconcileMissing(
         (xml, idx) =>
           !usedXmlIdx.has(idx) &&
           xml.nNF === row.nNF &&
-          cnpjOkFallback(xml, row.cnpjEmitente) &&
+          cnpjRaizOk(xml, row.cnpjEmitente) &&
+          normSerie(xml.serie) === normSerie(row.serie) &&
           valorBate(xml, planilhaVal)
       );
     }
@@ -243,6 +252,14 @@ export function reconcileMissing(
     };
 
     matched++;
+  }
+
+  // Remove linhas "não escriturado" de XMLs que acabaram de casar
+  const chavesCasadas = new Set<string>();
+  usedXmlIdx.forEach((idx) => { const k = newXmlData[idx].chNFe; if (k) chavesCasadas.add(k); });
+  for (let i = results.length - 1; i >= 0; i--) {
+    const r = results[i];
+    if ((r.status === 'nao_escriturado' || r.status === 'cancelada') && r.valorPlanilha == null && r.chNFe && chavesCasadas.has(r.chNFe)) results.splice(i, 1);
   }
 
   // Unmatched XMLs become "nao_escriturado"
@@ -340,7 +357,8 @@ export function reconcileExcel(
         (r, idx) =>
           !usedRowIdx.has(idx) &&
           r.nNF === xmlRow.nNF &&
-          cnpjOkFallback(xmlRow, r.cnpjEmitente) &&
+          cnpjRaizOk(xmlRow, r.cnpjEmitente) &&
+          normSerie(xmlRow.serie) === normSerie(r.serie) &&
           r.valorContabil != null &&
           Math.abs(r.valorContabil - xmlVal0) <= 0.01
       );
@@ -500,7 +518,8 @@ export function runConfronto(
       const found = cand.find(
         (idx) =>
           !usedXmlIdx.has(idx) &&
-          cnpjOkFallback(xmlData[idx], row.cnpjEmitente) &&
+          cnpjRaizOk(xmlData[idx], row.cnpjEmitente) &&
+          normSerie(xmlData[idx].serie) === normSerie(row.serie) &&
           valorBate(xmlData[idx], row.valorContabil)
       );
       if (found !== undefined) matchedIdx = found;
