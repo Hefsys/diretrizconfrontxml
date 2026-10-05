@@ -321,7 +321,8 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
     let etapa = 'carregar a base de XMLs';
     try {
       const { carregarXmlsDaEmpresa } = await import('@/lib/xml-storage');
-      const { reconcileMissing } = await import('@/lib/confronto-engine');
+      const { carregarLinhasDaEmpresa } = await import('@/lib/excel-storage');
+      const { reconcileMissing, refreshPlanilhaValues } = await import('@/lib/confronto-engine');
       const base = await carregarXmlsDaEmpresa(empresaId, (feitos, total) =>
         setProgressMsg(`Carregando ${feitos.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')} XML(s) da base…`)
       );
@@ -331,14 +332,26 @@ export function ResultsSection({ results: initialResults, summary: initialSummar
         return;
       }
 
+      // Atualiza os valores da planilha com a base atual (linhas corrigidas/reenviadas)
+      etapa = 'carregar a base de planilhas';
+      const linhasBase = await carregarLinhasDaEmpresa(empresaId, (feitas, total) =>
+        setProgressMsg(`Carregando ${feitas.toLocaleString('pt-BR')} de ${total.toLocaleString('pt-BR')} linha(s) de planilha da base…`)
+      );
+      setProgressMsg(null);
+      const { results: atualizados } = refreshPlanilhaValues(results, linhasBase);
+
       etapa = 'reconciliar com a base';
+      // Divergentes também podem ser recomparados com o XML da mesma chave
       const existentes = new Set(
-        results.filter((r) => r.status !== 'ausente_xml').map((r) => r.chNFe).filter((c) => !!c && c.length === 44)
+        atualizados
+          .filter((r) => r.status === 'ok' || r.status === 'cancelada')
+          .map((r) => r.chNFe)
+          .filter((c) => !!c && c.length === 44)
       );
       const candidatos = base.filter((x) => !existentes.has(x.chNFe));
 
       const { results: newResults, summary: newSummary, matched } = reconcileMissing(
-        results,
+        atualizados,
         candidatos,
         monthFilterFn()
       );

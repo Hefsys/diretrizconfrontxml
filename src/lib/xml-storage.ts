@@ -81,7 +81,7 @@ async function idsDoGrupo(empresaId: string): Promise<string[]> {
   return ids.length > 0 ? ids : [empresaId];
 }
 
-const SLIM_COLS = 'ch_nfe, n_nf, serie, dh_emi, cnpj_emitente, cnpj_dest, x_nome, v_nf, v_ipi, v_escriturado, cancelada';
+const SLIM_COLS = 'ch_nfe, n_nf, serie, dh_emi, cnpj_emitente, cnpj_dest, x_nome, v_nf, v_ipi, v_escriturado, cancelada, v_pis:xml_data->>vPIS, v_cofins:xml_data->>vCOFINS';
 
 interface SlimRow {
   ch_nfe: string | null;
@@ -95,6 +95,8 @@ interface SlimRow {
   v_ipi: number | null;
   v_escriturado?: number | null;
   cancelada: boolean | null;
+  v_pis?: string | number | null;
+  v_cofins?: string | number | null;
 }
 
 function toXmlNfe(r: SlimRow): XmlNfeData {
@@ -112,8 +114,8 @@ function toXmlNfe(r: SlimRow): XmlNfeData {
     vBCST: 0,
     vST: 0,
     vIPI: Number(r.v_ipi ?? 0),
-    vPIS: 0,
-    vCOFINS: 0,
+    vPIS: Number(r.v_pis ?? 0) || 0,
+    vCOFINS: Number(r.v_cofins ?? 0) || 0,
     vProd: 0,
     vEscriturado: r.v_escriturado == null ? undefined : Number(r.v_escriturado),
     cancelada: !!r.cancelada,

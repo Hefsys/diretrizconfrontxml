@@ -148,6 +148,46 @@ export function getMonthKey(data: string | null | undefined): string {
   return 'sem-data';
 }
 
+/**
+ * Atualiza o "Valor Planilha" de uma análise salva com os valores atuais da
+ * base de planilhas da empresa (ex.: linha corrigida após reenvio). Linhas com
+ * XML cujo valor mudou passam a "divergente" para serem recomparadas por
+ * `reconcileMissing`. Retorna quantas linhas mudaram.
+ */
+export function refreshPlanilhaValues(
+  results: ConfrontoResult[],
+  excelRows: ExcelNfeData[]
+): { results: ConfrontoResult[]; changed: number } {
+  const byKey = new Map<string, ExcelNfeData[]>();
+  const keyOf = (nNF: string, cnpj: string) => `${nNF}|${cleanCnpj(cnpj)}`;
+  for (const r of excelRows) {
+    if (!r.nNF) continue;
+    const k = keyOf(r.nNF, r.cnpjEmitente ?? '');
+    const arr = byKey.get(k) ?? [];
+    arr.push(r);
+    byKey.set(k, arr);
+  }
+  let changed = 0;
+  const out = results.map((row) => {
+    if (row.valorPlanilha == null || !row.nNF) return row;
+    if (row.status !== 'ok' && row.status !== 'divergente' && row.status !== 'ausente_xml') return row;
+    const cand = byKey.get(keyOf(row.nNF, row.cnpjEmitente ?? '')) ?? [];
+    const sameSerie = cand.filter((c) => normSerie(c.serie) === normSerie(row.serie));
+    const lista = sameSerie.length > 0 ? sameSerie : cand;
+    if (lista.length !== 1) return row; // ambíguo ou inexistente: não mexe
+    const novo = lista[0].valorContabil;
+    if (novo == null || Math.abs(novo - row.valorPlanilha) <= 0.01) return row;
+    changed++;
+    return {
+      ...row,
+      valorPlanilha: novo,
+      isZerada: novo === 0,
+      status: row.valorXml != null && row.status !== 'ausente_xml' ? 'divergente' : row.status,
+    } as ConfrontoResult;
+  });
+  return { results: out, changed };
+}
+
 export function reconcileMissing(
   currentResults: ConfrontoResult[],
   newXmlData: XmlNfeData[],
