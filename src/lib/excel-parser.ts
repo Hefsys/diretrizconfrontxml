@@ -207,7 +207,11 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     // última NF emitida.
     if (!nNF && !cnpj) {
       const last = results[results.length - 1];
-      if (!aposTotal && last && CNPJS_SOMA_AR.has(last.cnpjEmitente)) {
+      // Continuação legítima repete o CFOP da nota; linhas de total geral
+      // (ex.: "ICMS ST RET ENTRADA" no rodapé) não têm CFOP.
+      const temCfop = colMap.cfop < 0 ||
+        /^[123]\d{3}$/.test(String(row[colMap.cfop] ?? '').replace(/\D/g, ''));
+      if (!aposTotal && temCfop && last && CNPJS_SOMA_AR.has(last.cnpjEmitente)) {
         const arVal = parseCell(row[AR_COL_INDEX]);
         if (arVal !== 0) {
           last.valorContabil = +(last.valorContabil + arVal).toFixed(2);
