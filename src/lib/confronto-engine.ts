@@ -73,8 +73,13 @@ function cnpjRaizOk(x: { cnpjEmitente?: string | null; cnpjDest?: string | null 
  * valor escriturado do XML bate com a planilha, é ele que vale.
  */
 function valorXmlComparavel(xml: XmlNfeData, planilhaVal: number | null | undefined): number {
-  const esc = xml.vEscriturado;
-  if (esc != null && planilhaVal != null && Math.abs(planilhaVal - esc) <= 0.01) return esc;
+  if (planilhaVal != null) {
+    const esc = xml.vEscriturado;
+    if (esc != null && Math.abs(planilhaVal - esc) <= 0.01) return esc;
+    // Dealernet não soma PIS/COFINS (ST) destacados no vNF
+    const semPisCofins = +(xml.vNF - (xml.vPIS || 0) - (xml.vCOFINS || 0)).toFixed(2);
+    if ((xml.vPIS || xml.vCOFINS) && Math.abs(planilhaVal - semPisCofins) <= 0.01) return semPisCofins;
+  }
   return xml.vNF;
 }
 
