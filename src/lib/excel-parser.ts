@@ -185,9 +185,13 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
   const results: ExcelNfeData[] = [];
 
 
+  // Após uma linha "Total", linhas sem nNF são totais gerais — não somar na última NF.
+  let aposTotal = false;
+
   for (let i = dataStart; i < data.length; i++) {
     const row = data[i] as unknown[];
     if (!row || row.every((c) => !c || String(c).trim() === '')) continue;
+    if (row.some((c) => /^total:?$/i.test(String(c ?? '').trim()))) { aposTotal = true; continue; }
 
     const nNF = colMap.nNF >= 0 ? String(row[colMap.nNF] ?? '').trim() : '';
     const cnpj = colMap.cnpj >= 0 ? cleanCnpj(String(row[colMap.cnpj] ?? '')) : '';
@@ -203,7 +207,7 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     // última NF emitida.
     if (!nNF && !cnpj) {
       const last = results[results.length - 1];
-      if (last && CNPJS_SOMA_AR.has(last.cnpjEmitente)) {
+      if (!aposTotal && last && CNPJS_SOMA_AR.has(last.cnpjEmitente)) {
         const arVal = parseCell(row[AR_COL_INDEX]);
         if (arVal !== 0) {
           last.valorContabil = +(last.valorContabil + arVal).toFixed(2);
@@ -231,6 +235,7 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     // AR dela (ICMS ST RET ENTRADA). Só somamos o AR das linhas de continuação
     // (tratado no bloco acima, sem nNF).
 
+    aposTotal = false;
     results.push({
       nNF,
       serie: colMap.serie >= 0 ? String(row[colMap.serie] ?? '').trim() : '',
