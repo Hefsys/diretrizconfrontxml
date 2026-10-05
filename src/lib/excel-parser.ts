@@ -235,6 +235,7 @@ export function parseSheet(workbook: XLSX.WorkBook, sheetName: string): ExcelNfe
     // AR dela (ICMS ST RET ENTRADA). Só somamos o AR das linhas de continuação
     // (tratado no bloco acima, sem nNF).
 
+    aposTotal = false;
     results.push({
       nNF,
       serie: colMap.serie >= 0 ? String(row[colMap.serie] ?? '').trim() : '',
