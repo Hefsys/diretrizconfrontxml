@@ -44,6 +44,11 @@ export const Route = createRootRoute({
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b2657d51-ba2d-4aa0-b130-024f52661e86/id-preview-541ba79c--0d785596-a698-4937-8696-9fa97b33b55c.lovable.app-1776456276555.png" },
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b2657d51-ba2d-4aa0-b130-024f52661e86/id-preview-541ba79c--0d785596-a698-4937-8696-9fa97b33b55c.lovable.app-1776456276555.png" },
     ],
+    scripts: [
+      {
+        children: '(function(k,u){var v=localStorage.getItem("_hv")||Math.random().toString(36).slice(2);localStorage.setItem("_hv",v);var s=sessionStorage.getItem("_hs")||Math.random().toString(36).slice(2);sessionStorage.setItem("_hs",s);function t(){var d=JSON.stringify({k:k,p:location.pathname,r:document.referrer,v:v,s:s});navigator.sendBeacon?navigator.sendBeacon(u,new Blob([d],{type:"text/plain"})):fetch(u,{method:"POST",body:d,keepalive:true});}var o=history.pushState;history.pushState=function(){o.apply(this,arguments);t();};addEventListener("popstate",t);t();})("4646f3271afa9065ec49d5ff24e7f9b3","https://2759ecc8-6d14-4e25-8697-56ad976a5aa9.lovableproject.com/api/public/track");',
+      },
+    ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
